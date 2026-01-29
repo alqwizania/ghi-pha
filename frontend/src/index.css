@@ -1,0 +1,102 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ghi-navy: #000000;
+  --color-ghi-matte: #0A0A0A;
+  --color-ghi-border: #1A1A1A;
+  --color-ghi-blue: #00BAFF;
+  --color-ghi-teal: #00F2FF;
+  --color-ghi-critical: #FF3131;
+  --color-ghi-warning: #FFD700;
+  --color-ghi-success: #39FF14;
+
+  --font-din: 'DIN Next LT Pro', 'DIN Next', 'Bahnschrift', 'Inter', system-ui, sans-serif;
+
+  --animate-pulse-critical: pulse-red 2s infinite;
+  --animate-pulse-neon: pulse-neon 2s infinite;
+}
+
+@keyframes pulse-red {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 49, 49, 0.4);
+  }
+
+  70% {
+    box-shadow: 0 0 0 10px rgba(255, 49, 49, 0);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 49, 49, 0);
+  }
+}
+
+@keyframes pulse-neon {
+  0% {
+    box-shadow: 0 0 0 0 rgba(0, 242, 255, 0.4);
+  }
+
+  70% {
+    box-shadow: 0 0 0 10px rgba(0, 242, 255, 0);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(0, 242, 255, 0);
+  }
+}
+
+:root {
+  font-family: var(--font-din);
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background-color: var(--color-ghi-navy);
+  color: #F8FAFC;
+}
+
+/* Glassmorphism utility */
+.glass-panel {
+  background: rgba(13, 13, 13, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 242, 255, 0.1);
+}
+
+/* Sidebar active link */
+.sidebar-link-active {
+  background: rgba(0, 242, 255, 0.1);
+  border-left: 4px solid var(--color-ghi-teal);
+  color: var(--color-ghi-teal);
+  text-shadow: 0 0 8px rgba(0, 242, 255, 0.5);
+}
+
+.neon-text {
+  color: var(--color-ghi-teal);
+  text-shadow: 0 0 10px rgba(0, 242, 255, 0.4);
+}
+
+.neon-border {
+  border-color: var(--color-ghi-teal);
+  box-shadow: 0 0 15px rgba(0, 242, 255, 0.2);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1E293B;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
