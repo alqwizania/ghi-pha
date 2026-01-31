@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: ghi-backend
+    runtime: docker
+    env: python
+    region: frankfurt  # Nearest to your Neon region if possible
+    plan: free
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ghi_db
+          property: connectionString
+      # Note: We will set DATABASE_URL manually in the Render dashboard 
+      # using your Neon connection string.
