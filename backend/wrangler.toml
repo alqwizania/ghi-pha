@@ -1,0 +1,13 @@
+name = "ghi-backend"
+main = "app/main.py"
+compatibility_date = "2024-04-01"
+compatibility_flags = ["python_workers"]
+
+[vars]
+# We will use Hyperdrive to connect to Neon
+# You will set the DATABASE_URL secret using 'wrangler secret put DATABASE_URL'
+# Or via the Cloudflare Dashboard.
+
+[[hyperdrive]]
+binding = "HYPERDRIVE"
+id = "YOUR_HYPERDRIVE_ID_HERE"
