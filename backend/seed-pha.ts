@@ -9,35 +9,42 @@ const client = postgres(process.env.DATABASE_URL!);
 const db = drizzle(client, { schema });
 
 async function seed() {
-    console.log('Seeding initial PHA Admin...');
+    console.log('Seeding PHA Management Personnel...');
 
-    await db.insert(schema.users).values({
-        username: 'admin',
-        email: 'admin@pha.gov.sa',
-        fullName: 'System Admin',
-        role: 'Admin',
-        passwordHash: 'admin123', // In production, hash this!
-        permissions: {
-            dashboard: 'edit',
-            triage: 'edit',
-            assessment: 'edit',
-            escalation: 'edit'
-        }
-    }).onConflictDoUpdate({
-        target: schema.users.username,
-        set: {
+    const users = [
+        {
+            username: 'admin',
             email: 'admin@pha.gov.sa',
-            role: 'Admin',
-            permissions: {
-                dashboard: 'edit',
-                triage: 'edit',
-                assessment: 'edit',
-                escalation: 'edit'
-            }
+            fullName: 'PHA System Administrator',
+            role: 'Superadmin',
+            passwordHash: 'admin123',
+            permissions: { dashboard: 'edit', triage: 'edit', assessment: 'edit', escalation: 'edit' }
+        },
+        {
+            username: 'director',
+            email: 'director@pha.gov.sa',
+            fullName: 'Executive Director',
+            role: 'Director',
+            passwordHash: 'director123',
+            permissions: { dashboard: 'view', triage: 'edit', assessment: 'edit', escalation: 'edit' }
         }
-    });
+    ];
 
-    console.log('Seed complete. Admin account: admin / admin123');
+    for (const user of users) {
+        await db.insert(schema.users).values(user).onConflictDoUpdate({
+            target: schema.users.email,
+            set: {
+                role: user.role,
+                fullName: user.fullName,
+                permissions: user.permissions,
+                passwordHash: user.passwordHash
+            }
+        });
+    }
+
+    console.log('Seed complete.');
+    console.log('Superadmin: admin@pha.gov.sa / admin123');
+    console.log('Director: director@pha.gov.sa / director123');
     process.exit(0);
 }
 

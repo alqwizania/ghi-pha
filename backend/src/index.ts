@@ -30,11 +30,11 @@ const getDB = (hyperdrive: Hyperdrive) => {
 
 app.post('/api/v1/auth/login', async (c) => {
     try {
-        const { username, password } = await c.req.json();
+        const { email, password } = await c.req.json();
         const db = getDB(c.env.HYPERDRIVE);
 
         const user = await db.query.users.findFirst({
-            where: eq(schema.users.username, username)
+            where: eq(schema.users.email, email)
         });
 
         if (!user || user.passwordHash !== password) {

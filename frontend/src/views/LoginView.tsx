@@ -3,8 +3,8 @@ import { login } from '../lib/api';
 
 const LoginView = ({ onLogin }: { onLogin: (user: any) => void }) => {
     const [isScanning, setIsScanning] = useState(false);
-    const [username, setUsername] = useState('admin');
-    const [password, setPassword] = useState('admin123');
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
     const [error, setError] = useState('');
 
     const handleLogin = async (e: React.FormEvent) => {
@@ -12,7 +12,7 @@ const LoginView = ({ onLogin }: { onLogin: (user: any) => void }) => {
         setError('');
         setIsScanning(true);
         try {
-            const data = await login(username, password);
+            const data = await login(email, password);
             onLogin(data);
         } catch (err: any) {
             setError(err.message || 'Verification failed');
@@ -21,7 +21,7 @@ const LoginView = ({ onLogin }: { onLogin: (user: any) => void }) => {
     };
 
     return (
-        <div className="fixed inset-0 bg-ghi-navy flex items-center justify-center p-6 overflow-hidden font-din">
+        <div className="fixed inset-0 bg-ghi-navy flex flex-col items-center justify-center p-6 overflow-hidden font-din">
             {/* Background Effects */}
             <div className="absolute inset-0 z-0 flex items-center justify-center overflow-hidden">
                 <div className="absolute inset-0 bg-[linear-gradient(rgba(0,242,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(0,242,255,0.03)_1px,transparent_1px)] bg-[size:50px_50px]"></div>
@@ -67,15 +67,16 @@ const LoginView = ({ onLogin }: { onLogin: (user: any) => void }) => {
                         <h2 className="text-xs font-black tracking-[0.6em] text-white uppercase opacity-60">Intelligence</h2>
                     </div>
 
-                    <form onSubmit={handleLogin} className="space-y-6">
+                    <form onSubmit={handleLogin} className="space-y-6 text-left">
                         <div className="space-y-4">
                             <div className="relative group">
-                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest absolute -top-2 left-4 bg-ghi-navy px-2 z-10">Terminal ID</label>
+                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest absolute -top-2 left-4 bg-ghi-navy px-2 z-10">Email</label>
                                 <input
-                                    type="text"
-                                    value={username}
-                                    onChange={e => setUsername(e.target.value)}
-                                    className="w-full bg-white/[0.03] border border-white/10 rounded-2xl px-6 py-4 text-xs font-black tracking-widest text-white focus:ring-1 ring-ghi-teal outline-none transition-all"
+                                    type="email"
+                                    value={email}
+                                    placeholder="ghi@pha.gov.sa"
+                                    onChange={e => setEmail(e.target.value)}
+                                    className="w-full bg-white/[0.03] border border-white/10 rounded-2xl px-6 py-4 text-xs font-black tracking-widest text-white focus:ring-1 ring-ghi-teal outline-none transition-all placeholder:text-slate-700"
                                 />
                             </div>
                             <div className="relative group">
@@ -90,7 +91,7 @@ const LoginView = ({ onLogin }: { onLogin: (user: any) => void }) => {
                         </div>
 
                         {error && (
-                            <p className="text-ghi-critical text-[10px] font-black uppercase tracking-widest animate-pulse">
+                            <p className="text-ghi-critical text-[10px] font-black uppercase tracking-widest animate-pulse text-center">
                                 {error}
                             </p>
                         )}
@@ -116,6 +117,25 @@ const LoginView = ({ onLogin }: { onLogin: (user: any) => void }) => {
                             <span className="text-ghi-teal/40">Status: Optimal</span>
                             <span className="animate-pulse text-ghi-teal">LINK: BEACON</span>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Footer with Developer Info (Bottom of the page) */}
+            <div className="absolute bottom-8 left-0 w-full px-12 flex justify-between items-center z-10 pointer-events-none">
+                <p className="text-slate-700 text-[9px] font-bold uppercase tracking-widest pointer-events-auto">
+                    All rights reserved for PHA, Global Health Department
+                </p>
+                <div className="flex items-center gap-4 group pointer-events-auto cursor-help relative">
+                    <div className="flex -space-x-2">
+                        <div className="w-6 h-6 rounded-full border-2 border-ghi-navy bg-slate-800 flex items-center justify-center text-[8px] font-black text-white group-hover:scale-110 transition-transform">RA</div>
+                    </div>
+                    <p className="text-slate-700 text-[9px] font-bold uppercase tracking-widest group-hover:text-white transition-colors">
+                        System Architect: <span className="opacity-0 group-hover:opacity-100 transition-opacity ml-1">Rads Al-Garni</span>
+                    </p>
+                    {/* Tooltip Effect */}
+                    <div className="absolute bottom-full right-0 mb-4 px-4 py-2 glass-panel border border-ghi-teal/20 rounded-xl opacity-0 group-hover:opacity-100 transition-all translate-y-2 group-hover:translate-y-0">
+                        <p className="text-white text-[9px] font-black tracking-widest uppercase">Lead System Architect</p>
                     </div>
                 </div>
             </div>

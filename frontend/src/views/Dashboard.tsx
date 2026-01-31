@@ -142,13 +142,8 @@ const Dashboard = () => {
                 <p className="text-slate-500 text-[9px] font-bold uppercase tracking-widest">
                     All rights reserved for PHA, Global Health Department
                 </p>
-                <div className="flex items-center gap-4">
-                    <div className="flex -space-x-2">
-                        <div className="w-6 h-6 rounded-full border-2 border-ghi-navy bg-slate-800 flex items-center justify-center text-[8px] font-black text-white">RA</div>
-                    </div>
-                    <p className="text-slate-500 text-[9px] font-bold uppercase tracking-widest">
-                        System Architect: <span className="text-white">Rads Al-Garni</span>
-                    </p>
+                <div className="flex items-center gap-4 text-slate-700 text-[8px] font-black uppercase tracking-widest">
+                    SECURED SECTOR: ALPHA-01
                 </div>
             </div>
         </div>

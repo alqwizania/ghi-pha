@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Dashboard from './views/Dashboard';
 import Triage from './views/Triage';
 import AssessmentView from './views/AssessmentView';
@@ -52,22 +52,47 @@ const EscalationIcon = () => (
 
 function App() {
   const [user, setUser] = useState<any>(null);
-  const [activeView, setActiveView] = useState('dashboard');
+  const [activeView, setActiveView] = useState(() => {
+    const path = window.location.pathname.replace('/', '');
+    return path || 'dashboard';
+  });
+
+  useEffect(() => {
+    // Basic routing logic
+    const handlePopState = () => {
+      const path = window.location.pathname.replace('/', '');
+      setActiveView(path || 'dashboard');
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const navigate = (view: string) => {
+    setActiveView(view);
+    window.history.pushState({}, '', `/${view}`);
+  };
 
   if (!user) {
     return <LoginView onLogin={(userData) => setUser(userData)} />;
   }
 
   const navItems = [
-    { id: 'dashboard', label: 'DASHBOARD', icon: <DashboardIcon />, permission: 'dashboard' },
-    { id: 'triage', label: 'TRIAGE', icon: <TriageIcon />, permission: 'triage' },
-    { id: 'assessments', label: 'ASSESSMENTS', icon: <AssessmentIcon />, permission: 'assessment' },
-    { id: 'escalations', label: 'ESCALATIONS', icon: <EscalationIcon />, permission: 'escalation' },
+    { id: 'dashboard', label: 'DASHBOARD', icon: <DashboardIcon /> },
+    { id: 'triage', label: 'TRIAGE', icon: <TriageIcon /> },
+    { id: 'assessments', label: 'ASSESSMENTS', icon: <AssessmentIcon /> },
+    { id: 'escalations', label: 'ESCALATIONS', icon: <EscalationIcon /> },
   ];
 
-  if (user.role === 'Admin') {
-    navItems.push({ id: 'users', label: 'PERSONNEL', icon: <UserIcon />, permission: 'admin' });
+  // Specific restriction: Director and Superadmin (and Admin) see Personnel
+  const canSeePersonnel = user.role === 'Director' || user.role === 'Superadmin' || user.role === 'Admin';
+  if (canSeePersonnel) {
+    navItems.push({ id: 'users', label: 'PERSONNEL', icon: <UserIcon /> });
   }
+
+  const handleLogout = () => {
+    setUser(null);
+    window.history.pushState({}, '', '/');
+  };
 
   return (
     <div className="flex h-screen w-screen bg-ghi-navy text-slate-100 overflow-hidden font-din">
@@ -85,7 +110,7 @@ function App() {
           {navItems.map((item) => (
             <button
               key={item.id}
-              onClick={() => setActiveView(item.id)}
+              onClick={() => navigate(item.id)}
               className={`group w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-300 ${activeView === item.id
                 ? 'sidebar-link-active neon-border'
                 : 'text-slate-500 hover:text-ghi-teal hover:bg-ghi-teal/5'
@@ -99,19 +124,28 @@ function App() {
           ))}
         </nav>
 
-        <div className="p-6 border-t border-ghi-blue/10">
-          <div className="flex items-center gap-3 p-3 rounded-xl bg-ghi-teal/5 border border-ghi-teal/10">
-            <div className="w-8 h-8 rounded-lg bg-ghi-teal/20 flex items-center justify-center text-ghi-teal font-bold text-xs">
-              {user.fullName.split(' ').map((n: string) => n[0]).join('')}
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-white uppercase">{user.fullName}</p>
-              <div className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-ghi-success shadow-[0_0_8px_rgba(57,255,20,0.5)]"></span>
-                <p className="text-[9px] text-slate-500 uppercase font-black">{user.role}</p>
+        {/* Profile Card / Logout Button */}
+        <div className="p-4 border-t border-ghi-blue/10">
+          <button
+            onClick={handleLogout}
+            className="w-full text-left group transition-all"
+          >
+            <div className="flex items-center gap-3 p-3 rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-ghi-critical/10 hover:border-ghi-critical/30 transition-all">
+              <div className="w-10 h-10 rounded-xl bg-ghi-blue/20 flex items-center justify-center text-ghi-teal font-black text-xs border border-ghi-teal/20 group-hover:border-ghi-critical/50 transition-all">
+                {user.fullName.split(' ').map((n: string) => n[0]).join('')}
+              </div>
+              <div className="flex-1 overflow-hidden">
+                <p className="text-[10px] font-black text-white uppercase truncate group-hover:text-ghi-critical transition-colors">{user.fullName}</p>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-ghi-success shadow-[0_0_8px_rgba(57,255,20,0.5)]"></span>
+                  <p className="text-[9px] text-slate-500 uppercase font-black tracking-tighter">{user.role}</p>
+                </div>
+              </div>
+              <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                <svg className="w-4 h-4 text-ghi-critical" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
               </div>
             </div>
-          </div>
+          </button>
         </div>
       </aside>
 
