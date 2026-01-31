@@ -201,6 +201,23 @@ app.post('/api/v1/assessments/:id/escalate', async (c) => {
     return c.json({ success: true });
 });
 
+app.put('/api/v1/users/:id', async (c) => {
+    const id = c.req.param('id');
+    const body = await c.req.json();
+    const db = getDB(c.env.HYPERDRIVE);
+
+    await db.update(schema.users)
+        .set({
+            fullName: body.fullName,
+            role: body.role,
+            permissions: body.permissions,
+            updatedAt: new Date()
+        })
+        .where(eq(schema.users.id, id));
+
+    return c.json({ success: true });
+});
+
 app.get('/api/v1/escalations', async (c) => {
     const db = getDB(c.env.HYPERDRIVE);
     const result = await db.query.escalations.findMany({

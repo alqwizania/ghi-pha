@@ -89,8 +89,8 @@ function App() {
       {/* Mobile Header */}
       <header className="lg:hidden flex items-center justify-between px-6 py-4 bg-ghi-navy/50 backdrop-blur-md border-b border-white/5 z-50">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-ghi-teal/20 flex items-center justify-center text-ghi-teal font-black text-[10px] border border-ghi-teal/20">GHI</div>
-          <span className="text-[10px] font-black tracking-widest text-white uppercase">{activeView}</span>
+          <GHICLogo />
+          <span className="text-[10px] font-black tracking-widest text-white uppercase ml-4">{activeView}</span>
         </div>
         <button
           onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -178,13 +178,7 @@ function App() {
           </div>
 
           <div className="flex gap-6">
-            <div className="px-5 py-2.5 glass-panel rounded-xl flex items-center gap-3 border-ghi-critical/20 group cursor-pointer hover:border-ghi-critical/50 transition-all">
-              <div className="w-2 h-2 rounded-full bg-ghi-critical pulse-critical shadow-[0_0_10px_#FF3131]"></div>
-              <div>
-                <p className="text-[10px] font-black text-white leading-none">CRITICAL</p>
-                <p className="text-[8px] text-slate-500 font-bold uppercase mt-1">High Priority Intel</p>
-              </div>
-            </div>
+            {/* Empty space or future dynamic alerts */}
           </div>
         </header>
 

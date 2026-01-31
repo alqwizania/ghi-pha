@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
-import { fetchUsers, createUser } from '../lib/api';
+import { fetchUsers, createUser, updateUser } from '../lib/api';
 
 const UserManagement = () => {
     const [users, setUsers] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [showAddForm, setShowAddForm] = useState(false);
+    const [editingUser, setEditingUser] = useState<any>(null);
+
     const [newUser, setNewUser] = useState({
         username: '',
         email: '',
@@ -56,19 +58,105 @@ const UserManagement = () => {
         }
     };
 
+    const handleUpdate = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            await updateUser(editingUser.id, editingUser);
+            setEditingUser(null);
+            loadUsers();
+        } catch (err) {
+            alert('Failed to update member credentials.');
+        }
+    };
+
     if (loading) return <div className="text-ghi-teal animate-pulse font-black text-center p-20 uppercase tracking-[0.3em]">Querying Personnel Database...</div>;
 
     return (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-1000">
             <div className="flex justify-between items-center">
-                <h3 className="text-xl font-black text-white uppercase tracking-widest">Personnel Directory</h3>
+                <h3 className="text-xl font-black text-white uppercase tracking-widest leading-none">Personnel Directory</h3>
                 <button
-                    onClick={() => setShowAddForm(!showAddForm)}
+                    onClick={() => { setShowAddForm(!showAddForm); setEditingUser(null); }}
                     className="px-6 py-2 bg-ghi-teal/10 hover:bg-ghi-teal/20 text-ghi-teal text-[10px] font-black tracking-[0.2em] rounded-xl transition-all border border-ghi-teal/30 uppercase"
                 >
                     {showAddForm ? 'Cancel Operation' : 'Add New Member'}
                 </button>
             </div>
+
+            {/* Editing Modal */}
+            {editingUser && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-ghi-navy/90 backdrop-blur-xl">
+                    <div className="glass-panel w-full max-w-2xl p-10 rounded-[2.5rem] border border-ghi-teal/30 shadow-2xl shadow-ghi-teal/10 relative overflow-hidden">
+                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-ghi-teal/40 to-transparent"></div>
+
+                        <div className="flex justify-between items-center mb-10">
+                            <div>
+                                <h3 className="text-xl font-black text-white uppercase tracking-widest">Update Credentials</h3>
+                                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Modifying Directive ID: {editingUser.username}</p>
+                            </div>
+                            <button onClick={() => setEditingUser(null)} className="text-slate-500 hover:text-white transition-colors">
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleUpdate} className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                            <div className="space-y-6">
+                                <div>
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 block">Full Identity</label>
+                                    <input
+                                        required
+                                        className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-5 py-3 text-sm text-white focus:border-ghi-teal outline-none transition-all font-black tracking-widest"
+                                        value={editingUser.fullName}
+                                        onChange={e => setEditingUser({ ...editingUser, fullName: e.target.value })}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 block">Access Level</label>
+                                    <select
+                                        className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-5 py-3 text-sm text-ghi-teal focus:border-ghi-teal outline-none transition-all font-black"
+                                        value={editingUser.role}
+                                        onChange={e => setEditingUser({ ...editingUser, role: e.target.value })}
+                                    >
+                                        <option value="Analyst">ANALYST</option>
+                                        <option value="Director">DIRECTOR</option>
+                                        <option value="Superadmin">SUPERADMIN</option>
+                                        <option value="Admin">ADMIN</option>
+                                    </select>
+                                </div>
+                                <div className="pt-4">
+                                    <button className="w-full py-4 bg-ghi-teal/20 text-ghi-teal font-black text-[11px] tracking-[0.4em] rounded-2xl hover:bg-ghi-teal/30 transition-all uppercase border border-ghi-teal/30">
+                                        Commit Changes
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="space-y-4 pt-2">
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1 block underline underline-offset-8 decoration-ghi-teal/30">Privilege Matrix</label>
+                                {Object.keys(editingUser.permissions || {}).map((key) => (
+                                    <div key={key} className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/5">
+                                        <span className="text-[10px] font-black text-white uppercase tracking-widest">{key}</span>
+                                        <select
+                                            className="bg-ghi-navy border-white/20 text-[10px] font-black text-ghi-teal rounded-lg px-3 py-1 outline-none"
+                                            value={(editingUser.permissions as any)[key]}
+                                            onChange={e => setEditingUser({
+                                                ...editingUser,
+                                                permissions: {
+                                                    ...editingUser.permissions,
+                                                    [key]: e.target.value
+                                                }
+                                            })}
+                                        >
+                                            <option value="view">VIEW ONLY</option>
+                                            <option value="edit">EDIT ACCESS</option>
+                                            <option value="update">UPDATE ACCESS</option>
+                                        </select>
+                                    </div>
+                                ))}
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
 
             {showAddForm && (
                 <div className="glass-panel p-8 rounded-3xl border border-ghi-teal/20 animate-in zoom-in-95 duration-300">
@@ -152,8 +240,8 @@ const UserManagement = () => {
                             <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Personnel</th>
                             <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Email Domain</th>
                             <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">System Role</th>
-                            <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Permissions</th>
-                            <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Status</th>
+                            <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Matrix</th>
+                            <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
@@ -161,12 +249,12 @@ const UserManagement = () => {
                             <tr key={user.id} className="group hover:bg-white/[0.02] transition-colors">
                                 <td className="px-8 py-6">
                                     <div className="flex items-center gap-4">
-                                        <div className="w-10 h-10 rounded-full bg-ghi-teal/10 flex items-center justify-center text-ghi-teal font-black text-xs">
+                                        <div className="w-10 h-10 rounded-full bg-ghi-teal/10 flex items-center justify-center text-ghi-teal font-black text-xs border border-ghi-teal/10 group-hover:border-ghi-teal/40 transition-all duration-500">
                                             {user.fullName.split(' ').map((n: string) => n[0]).join('')}
                                         </div>
                                         <div>
                                             <p className="text-white font-black text-xs uppercase tracking-widest">{user.fullName}</p>
-                                            <p className="text-slate-500 text-[9px] font-bold">ID: {user.username}</p>
+                                            <p className="text-slate-500 text-[8px] font-bold uppercase tracking-widest mt-0.5">ID: {user.username}</p>
                                         </div>
                                     </div>
                                 </td>
@@ -180,19 +268,21 @@ const UserManagement = () => {
                                     <div className="flex gap-2">
                                         {Object.entries(user.permissions || {}).map(([key, val]) => (
                                             <div key={key} className="group/perm relative">
-                                                <span className={`w-2 h-2 rounded-full inline-block ${val === 'edit' ? 'bg-ghi-teal' : val === 'update' ? 'bg-ghi-warning' : 'bg-slate-700'}`}></span>
-                                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-ghi-navy border border-white/10 rounded text-[8px] font-black text-white whitespace-nowrap opacity-0 group-hover/perm:opacity-100 transition-opacity uppercase tracking-widest">
+                                                <span className={`w-2 h-2 rounded-full inline-block ${val === 'edit' ? 'bg-ghi-teal shadow-[0_0_8px_#00F2FF]' : val === 'update' ? 'bg-ghi-warning shadow-[0_0_8px_#FFD700]' : 'bg-slate-700'}`}></span>
+                                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-ghi-navy border border-white/10 rounded text-[8px] font-black text-white whitespace-nowrap opacity-0 group-hover/perm:opacity-100 transition-opacity uppercase tracking-widest z-50 backdrop-blur-md">
                                                     {key}: {val as any}
                                                 </div>
                                             </div>
                                         ))}
                                     </div>
                                 </td>
-                                <td className="px-8 py-6">
-                                    <div className="flex items-center gap-2">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-ghi-success shadow-[0_0_8px_#39FF14]"></span>
-                                        <span className="text-[9px] font-black text-ghi-success uppercase tracking-widest">Authorized</span>
-                                    </div>
+                                <td className="px-8 py-6 text-right">
+                                    <button
+                                        onClick={() => setEditingUser(user)}
+                                        className="p-2.5 rounded-xl bg-white/[0.02] border border-white/5 hover:border-ghi-teal/50 text-slate-500 hover:text-ghi-teal transition-all group/edit"
+                                    >
+                                        <svg className="w-4 h-4 group-hover/edit:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-5M16.138 2.376a2.25 2.25 0 013.182 3.182L10.334 14.54a1.125 1.125 0 01-.482.287l-2.731.796.796-2.731a1.125 1.125 0 01.287-.482L16.138 2.376z" /></svg>
+                                    </button>
                                 </td>
                             </tr>
                         ))}
