@@ -80,7 +80,7 @@ const LoginView = ({ onLogin }: { onLogin: (user: any) => void }) => {
                                 />
                             </div>
                             <div className="relative group">
-                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest absolute -top-2 left-4 bg-ghi-navy px-2 z-10">Access Key</label>
+                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest absolute -top-2 left-4 bg-ghi-navy px-2 z-10">Password</label>
                                 <input
                                     type="password"
                                     value={password}
@@ -128,10 +128,10 @@ const LoginView = ({ onLogin }: { onLogin: (user: any) => void }) => {
                 </p>
                 <div className="flex items-center gap-4 group pointer-events-auto cursor-help relative">
                     <div className="flex -space-x-2">
-                        <div className="w-6 h-6 rounded-full border-2 border-ghi-navy bg-slate-800 flex items-center justify-center text-[8px] font-black text-white group-hover:scale-110 transition-transform">RA</div>
+                        <div className="w-6 h-6 rounded-full border-2 border-ghi-navy bg-slate-800 flex items-center justify-center text-[8px] font-black text-white group-hover:scale-110 transition-transform">AA</div>
                     </div>
                     <p className="text-slate-700 text-[9px] font-bold uppercase tracking-widest group-hover:text-white transition-colors">
-                        System Architect: <span className="opacity-0 group-hover:opacity-100 transition-opacity ml-1">Rads Al-Garni</span>
+                        System Architect: <span className="opacity-0 group-hover:opacity-100 transition-opacity ml-1">Dr. Abdulmalek AlQwizani</span>
                     </p>
                     {/* Tooltip Effect */}
                     <div className="absolute bottom-full right-0 mb-4 px-4 py-2 glass-panel border border-ghi-teal/20 rounded-xl opacity-0 group-hover:opacity-100 transition-all translate-y-2 group-hover:translate-y-0">
