@@ -4,6 +4,7 @@ import Triage from './views/Triage';
 import AssessmentView from './views/AssessmentView';
 import EscalationView from './views/EscalationView';
 import LoginView from './views/LoginView';
+import UserManagement from './views/UserManagement';
 
 const GHICLogo = () => (
   <div className="relative flex items-center justify-center group">
@@ -17,6 +18,12 @@ const GHICLogo = () => (
       <circle cx="24" cy="24" r="1.5" className="fill-ghi-teal animate-ping" />
     </svg>
   </div>
+);
+
+const UserIcon = () => (
+  <svg className="w-6 h-6 transition-transform group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+  </svg>
 );
 
 const DashboardIcon = () => (
@@ -44,19 +51,23 @@ const EscalationIcon = () => (
 );
 
 function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [user, setUser] = useState<any>(null);
   const [activeView, setActiveView] = useState('dashboard');
 
-  if (!isAuthenticated) {
-    return <LoginView onLogin={() => setIsAuthenticated(true)} />;
+  if (!user) {
+    return <LoginView onLogin={(userData) => setUser(userData)} />;
   }
 
   const navItems = [
-    { id: 'dashboard', label: 'DASHBOARD', icon: <DashboardIcon /> },
-    { id: 'triage', label: 'TRIAGE', icon: <TriageIcon /> },
-    { id: 'assessments', label: 'ASSESSMENTS', icon: <AssessmentIcon /> },
-    { id: 'escalations', label: 'ESCALATIONS', icon: <EscalationIcon /> },
+    { id: 'dashboard', label: 'DASHBOARD', icon: <DashboardIcon />, permission: 'dashboard' },
+    { id: 'triage', label: 'TRIAGE', icon: <TriageIcon />, permission: 'triage' },
+    { id: 'assessments', label: 'ASSESSMENTS', icon: <AssessmentIcon />, permission: 'assessment' },
+    { id: 'escalations', label: 'ESCALATIONS', icon: <EscalationIcon />, permission: 'escalation' },
   ];
+
+  if (user.role === 'Admin') {
+    navItems.push({ id: 'users', label: 'PERSONNEL', icon: <UserIcon />, permission: 'admin' });
+  }
 
   return (
     <div className="flex h-screen w-screen bg-ghi-navy text-slate-100 overflow-hidden font-din">
@@ -90,12 +101,14 @@ function App() {
 
         <div className="p-6 border-t border-ghi-blue/10">
           <div className="flex items-center gap-3 p-3 rounded-xl bg-ghi-teal/5 border border-ghi-teal/10">
-            <div className="w-8 h-8 rounded-lg bg-ghi-teal/20 flex items-center justify-center text-ghi-teal font-bold text-xs">SA</div>
+            <div className="w-8 h-8 rounded-lg bg-ghi-teal/20 flex items-center justify-center text-ghi-teal font-bold text-xs">
+              {user.fullName.split(' ').map((n: string) => n[0]).join('')}
+            </div>
             <div>
-              <p className="text-[10px] font-bold text-white">Analyst SA-01</p>
+              <p className="text-[10px] font-bold text-white uppercase">{user.fullName}</p>
               <div className="flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-ghi-success shadow-[0_0_8px_rgba(57,255,20,0.5)]"></span>
-                <p className="text-[9px] text-slate-500 uppercase font-black">Secure</p>
+                <p className="text-[9px] text-slate-500 uppercase font-black">{user.role}</p>
               </div>
             </div>
           </div>
@@ -103,10 +116,10 @@ function App() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto bg-ghi-navy p-8 relative">
+      <main className="flex-1 overflow-y-auto bg-ghi-navy p-8 relative flex flex-col">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,_rgba(0,242,255,0.05)_0%,_transparent_50%)] pointer-events-none"></div>
 
-        <header className="flex justify-between items-center mb-10 relative z-10">
+        <header className="flex justify-between items-center mb-10 relative z-10 shrink-0">
           <div>
             <h2 className="text-2xl font-black text-white tracking-widest uppercase mb-1">{activeView}</h2>
             <div className="flex items-center gap-2">
@@ -123,22 +136,16 @@ function App() {
                 <p className="text-[8px] text-slate-500 font-bold uppercase mt-1">Signals Active</p>
               </div>
             </div>
-            <div className="px-5 py-2.5 glass-panel rounded-xl flex items-center gap-3 border-ghi-teal/20 group cursor-pointer hover:border-ghi-teal/50 transition-all">
-              <div className="w-2 h-2 rounded-full bg-ghi-teal shadow-[0_0_10px_#00F2FF]"></div>
-              <div>
-                <p className="text-[10px] font-black text-white leading-none">18 PENDING</p>
-                <p className="text-[8px] text-slate-500 font-bold uppercase mt-1">Triage Queue</p>
-              </div>
-            </div>
           </div>
         </header>
 
         {/* View Content */}
-        <div className="relative z-10">
+        <div className="relative z-10 flex-1">
           {activeView === 'dashboard' && <Dashboard />}
-          {activeView === 'triage' && <Triage />}
-          {activeView === 'assessments' && <AssessmentView />}
+          {activeView === 'triage' && <Triage user={user} />}
+          {activeView === 'assessments' && <AssessmentView user={user} />}
           {activeView === 'escalations' && <EscalationView />}
+          {activeView === 'users' && <UserManagement />}
         </div>
       </main>
     </div>

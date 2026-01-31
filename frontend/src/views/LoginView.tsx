@@ -1,14 +1,23 @@
 ﻿import { useState } from 'react';
+import { login } from '../lib/api';
 
-const LoginView = ({ onLogin }: { onLogin: () => void }) => {
+const LoginView = ({ onLogin }: { onLogin: (user: any) => void }) => {
     const [isScanning, setIsScanning] = useState(false);
+    const [username, setUsername] = useState('admin');
+    const [password, setPassword] = useState('admin123');
+    const [error, setError] = useState('');
 
-    const handleLogin = (e: React.FormEvent) => {
+    const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
+        setError('');
         setIsScanning(true);
-        setTimeout(() => {
-            onLogin();
-        }, 2000);
+        try {
+            const data = await login(username, password);
+            onLogin(data);
+        } catch (err: any) {
+            setError(err.message || 'Verification failed');
+            setIsScanning(false);
+        }
     };
 
     return (
@@ -61,25 +70,34 @@ const LoginView = ({ onLogin }: { onLogin: () => void }) => {
                     <form onSubmit={handleLogin} className="space-y-6">
                         <div className="space-y-4">
                             <div className="relative group">
-                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest absolute -top-2 left-4 bg-ghi-navy px-2 z-10">Email</label>
+                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest absolute -top-2 left-4 bg-ghi-navy px-2 z-10">Terminal ID</label>
                                 <input
                                     type="text"
-                                    defaultValue="analyst@ghi.gov"
+                                    value={username}
+                                    onChange={e => setUsername(e.target.value)}
                                     className="w-full bg-white/[0.03] border border-white/10 rounded-2xl px-6 py-4 text-xs font-black tracking-widest text-white focus:ring-1 ring-ghi-teal outline-none transition-all"
                                 />
                             </div>
                             <div className="relative group">
-                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest absolute -top-2 left-4 bg-ghi-navy px-2 z-10">Password</label>
+                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest absolute -top-2 left-4 bg-ghi-navy px-2 z-10">Access Key</label>
                                 <input
                                     type="password"
-                                    defaultValue="••••••••"
+                                    value={password}
+                                    onChange={e => setPassword(e.target.value)}
                                     className="w-full bg-white/[0.03] border border-white/10 rounded-2xl px-6 py-4 text-xs font-black tracking-widest text-white focus:ring-1 ring-ghi-teal outline-none transition-all"
                                 />
                             </div>
                         </div>
 
+                        {error && (
+                            <p className="text-ghi-critical text-[10px] font-black uppercase tracking-widest animate-pulse">
+                                {error}
+                            </p>
+                        )}
+
                         <button
                             type="submit"
+                            disabled={isScanning}
                             className="w-full py-5 bg-ghi-teal/10 hover:bg-ghi-teal/20 text-ghi-teal font-black text-[11px] uppercase tracking-[0.4em] rounded-2xl transition-all border border-ghi-teal/30 relative overflow-hidden group"
                         >
                             <span className={isScanning ? 'opacity-0' : 'opacity-100 transition-opacity'}>LOGIN</span>
