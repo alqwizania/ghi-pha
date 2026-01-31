@@ -10,4 +10,4 @@ compatibility_flags = ["python_workers"]
 
 [[hyperdrive]]
 binding = "HYPERDRIVE"
-id = "YOUR_HYPERDRIVE_ID_HERE"
+id = "2c3d595f50c14b81a7ac44cb52a5d40a"
