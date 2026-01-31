@@ -60,7 +60,8 @@ app.post('/api/v1/auth/login', async (c) => {
             permissions: user.permissions
         });
     } catch (e) {
-        return c.json({ error: 'Login failed' }, 500);
+        console.error('Login Error:', e);
+        return c.json({ error: 'Login failed', details: e instanceof Error ? e.message : String(e) }, 500);
     }
 });
 
@@ -115,12 +116,89 @@ app.get('/api/v1/signals', async (c) => {
     return c.json(result);
 });
 
+app.post('/api/v1/signals/:id/accept', async (c) => {
+    const id = c.req.param('id');
+    const db = getDB(c.env.HYPERDRIVE);
+
+    // Update signal status
+    await db.update(schema.signals)
+        .set({ triageStatus: 'Accepted', currentStatus: 'Under Assessment' })
+        .where(eq(schema.signals.id, id));
+
+    // Create linked assessment
+    const [newAssessment] = await db.insert(schema.assessments).values({
+        signalId: id,
+        assessmentType: 'IHR/RRA',
+        assignedTo: '00000000-0000-0000-0000-000000000000', // Default placeholder or current user
+        status: 'Draft'
+    }).returning();
+
+    return c.json({ success: true, assessmentId: newAssessment.id });
+});
+
+app.post('/api/v1/signals/:id/reject', async (c) => {
+    const id = c.req.param('id');
+    const db = getDB(c.env.HYPERDRIVE);
+    await db.update(schema.signals)
+        .set({ triageStatus: 'Rejected', currentStatus: 'Archived' })
+        .where(eq(schema.signals.id, id));
+    return c.json({ success: true });
+});
+
 app.get('/api/v1/assessments', async (c) => {
     const db = getDB(c.env.HYPERDRIVE);
     const result = await db.query.assessments.findMany({
         with: { signal: true }
     });
     return c.json(result);
+});
+
+app.put('/api/v1/assessments/:id', async (c) => {
+    const id = c.req.param('id');
+    const body = await c.req.json();
+    const db = getDB(c.env.HYPERDRIVE);
+
+    await db.update(schema.assessments)
+        .set({
+            ihrQuestion1: body.q1,
+            ihrQuestion2: body.q2,
+            ihrQuestion3: body.q3,
+            ihrQuestion4: body.q4,
+            rraOverallRisk: body.riskLevel,
+            rraHazardAssessment: body.hazard,
+            rraExposureAssessment: body.exposure,
+            rraContext_assessment: body.context,
+            updatedAt: new Date()
+        })
+        .where(eq(schema.assessments.id, id));
+
+    return c.json({ success: true });
+});
+
+app.post('/api/v1/assessments/:id/escalate', async (c) => {
+    const id = c.req.param('id');
+    const body = await c.req.json();
+    const db = getDB(c.env.HYPERDRIVE);
+
+    const assessment = await db.query.assessments.findFirst({
+        where: eq(schema.assessments.id, id)
+    });
+
+    if (!assessment) return c.json({ error: 'Assessment not found' }, 404);
+
+    await db.insert(schema.escalations).values({
+        signalId: assessment.signalId,
+        assessmentId: id,
+        priority: body.priority || 'High',
+        escalationReason: body.reason || 'Criteria met for PH Emergency',
+        escalatedBy: body.userId || '00000000-0000-0000-0000-000000000000'
+    });
+
+    await db.update(schema.assessments)
+        .set({ status: 'Escalated' })
+        .where(eq(schema.assessments.id, id));
+
+    return c.json({ success: true });
 });
 
 app.get('/api/v1/escalations', async (c) => {

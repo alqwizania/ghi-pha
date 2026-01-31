@@ -1,12 +1,30 @@
-
 import { useState, useEffect } from 'react';
-import { fetchSignals } from '../lib/api';
+import { fetchSignals, acceptSignal, rejectSignal } from '../lib/api';
 
-const SignalCard = ({ signal, user }: any) => {
+const SignalCard = ({ signal, user, onAction }: any) => {
     const canAction = user?.permissions?.triage === 'edit' || user?.permissions?.triage === 'update' || user?.role === 'Admin';
+    const [isProcessing, setIsProcessing] = useState(false);
+
+    const handleAction = async (type: 'accept' | 'reject') => {
+        setIsProcessing(true);
+        try {
+            if (type === 'accept') await acceptSignal(signal.id);
+            else await rejectSignal(signal.id);
+            onAction();
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setIsProcessing(false);
+        }
+    };
 
     return (
         <div className={`glass-panel p-8 rounded-3xl border border-white/5 relative overflow-hidden transition-all duration-500 hover:border-ghi-blue/30 group ${signal.priorityScore > 85 ? 'pulse-critical ring-1 ring-ghi-critical/20' : ''}`}>
+            {isProcessing && (
+                <div className="absolute inset-0 bg-ghi-navy/80 z-50 flex items-center justify-center backdrop-blur-sm">
+                    <div className="text-ghi-teal font-black text-[10px] animate-pulse uppercase tracking-[0.3em]">Processing Directive...</div>
+                </div>
+            )}
             <div className="absolute top-0 right-0 w-32 h-32 bg-ghi-teal/5 blur-3xl rounded-full -mr-16 -mt-16 group-hover:bg-ghi-teal/10 transition-all"></div>
 
             <div className="flex justify-between items-start mb-6 relative z-10">
@@ -48,12 +66,14 @@ const SignalCard = ({ signal, user }: any) => {
 
             <div className="flex gap-4 relative z-10">
                 <button
-                    disabled={!canAction}
+                    disabled={!canAction || isProcessing}
+                    onClick={() => handleAction('reject')}
                     className={`flex-1 px-5 py-3 text-[10px] font-black tracking-[0.2em] rounded-xl transition-all border border-white/5 uppercase ${canAction ? 'bg-white/5 hover:bg-ghi-critical/10 text-slate-400 hover:text-ghi-critical hover:border-ghi-critical/30' : 'bg-white/5 text-slate-600 cursor-not-allowed opacity-50'}`}>
                     REJECT INTEL
                 </button>
                 <button
-                    disabled={!canAction}
+                    disabled={!canAction || isProcessing}
+                    onClick={() => handleAction('accept')}
                     className={`flex-1 px-5 py-3 text-[10px] font-black tracking-[0.2em] rounded-xl transition-all border uppercase ${canAction ? 'bg-ghi-teal/10 hover:bg-ghi-teal/20 text-ghi-teal border-ghi-teal/30 hover:shadow-[0_0_20px_rgba(0,242,255,0.15)]' : 'bg-ghi-teal/5 text-ghi-teal/30 border-ghi-teal/10 cursor-not-allowed'}`}>
                     INITIATE RESPONSE
                 </button>
@@ -71,10 +91,19 @@ const Triage = ({ user }: any) => {
     const [signals, setSignals] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
+    const loadSignals = () => {
+        setLoading(true);
         fetchSignals()
-            .then(data => setSignals(data))
+            .then(data => {
+                // Filter only signals that aren't accepted or rejected yet
+                const pending = data.filter((s: any) => s.triageStatus === 'Pending Triage' || !s.triageStatus);
+                setSignals(pending);
+            })
             .finally(() => setLoading(false));
+    };
+
+    useEffect(() => {
+        loadSignals();
     }, []);
 
     if (loading) {
@@ -102,7 +131,7 @@ const Triage = ({ user }: any) => {
             </div>
 
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-                {signals.map(s => <SignalCard key={s.id} signal={s} user={user} />)}
+                {signals.map(s => <SignalCard key={s.id} signal={s} user={user} onAction={loadSignals} />)}
                 {signals.length === 0 && (
                     <div className="col-span-2 text-center py-20 bg-white/[0.02] rounded-[2.5rem] border border-dashed border-white/10">
                         <p className="text-slate-500 font-black text-xs uppercase tracking-[0.3em]">No signals detected in recent surveillance window</p>
