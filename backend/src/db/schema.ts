@@ -101,15 +101,70 @@ export const users = pgTable("users", {
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
+
+// Social Listening Tables
+export const socialSignals = pgTable("social_signals", {
+    id: uuid("id").primaryKey().defaultRandom(),
+    platform: varchar("platform", { length: 50 }).default("twitter").notNull(),
+    postId: varchar("post_id", { length: 255 }).unique().notNull(),
+    author: varchar("author", { length: 255 }).notNull(),
+    authorHandle: varchar("author_handle", { length: 255 }).notNull(),
+    content: text("content").notNull(),
+    language: varchar("language", { length: 10 }).default("en"),
+    location: varchar("location", { length: 255 }),
+    hashtags: jsonb("hashtags").default([]),
+    mentions: jsonb("mentions").default([]),
+    urls: jsonb("urls").default([]),
+    engagement: jsonb("engagement").default({ likes: 0, retweets: 0, replies: 0 }),
+    detectedKeywords: jsonb("detected_keywords").default([]),
+    relevanceScore: numeric("relevance_score", { precision: 5, scale: 2 }).default("0"),
+    sentimentScore: numeric("sentiment_score", { precision: 5, scale: 2 }),
+    verificationStatus: varchar("verification_status", { length: 50 }).default("Pending"),
+    relatedSignalId: uuid("related_signal_id").references(() => signals.id, { onDelete: "set null" }),
+    promotedAt: timestamp("promoted_at", { withTimezone: true }),
+    promotedBy: uuid("promoted_by").references(() => users.id),
+    isDismissed: boolean("is_dismissed").default(false),
+    postedAt: timestamp("posted_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+
+export const monitoredAccounts = pgTable("monitored_accounts", {
+    id: uuid("id").primaryKey().defaultRandom(),
+    platform: varchar("platform", { length: 50 }).default("twitter").notNull(),
+    accountHandle: varchar("account_handle", { length: 255 }).unique().notNull(),
+    accountName: varchar("account_name", { length: 255 }).notNull(),
+    accountType: varchar("account_type", { length: 50 }).notNull(), // official, media, expert, influencer
+    region: varchar("region", { length: 100 }),
+    priority: integer("priority").default(2), // 1=highest, 2=high, 3=medium
+    isActive: boolean("is_active").default(true),
+    description: text("description"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+
+export const listenerKeywords = pgTable("listener_keywords", {
+    id: uuid("id").primaryKey().defaultRandom(),
+    keyword: varchar("keyword", { length: 255 }).notNull(),
+    category: varchar("category", { length: 50 }).notNull(), // disease, location, severity, organization
+    language: varchar("language", { length: 10 }).default("en"),
+    priority: integer("priority").default(2), // 1=critical, 2=high, 3=medium
+    isActive: boolean("is_active").default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+
 // Relations
 export const signalRelations = relations(signals, ({ many }) => ({
     assessments: many(assessments),
     escalations: many(escalations),
+    socialSignals: many(socialSignals),
 }));
 
 export const userRelations = relations(users, ({ many }) => ({
     assessments: many(assessments),
     escalations: many(escalations),
+    promotedSocialSignals: many(socialSignals),
 }));
 
 export const assessmentRelations = relations(assessments, ({ one, many }) => ({
@@ -122,4 +177,9 @@ export const escalationRelations = relations(escalations, ({ one }) => ({
     signal: one(signals, { fields: [escalations.signalId], references: [signals.id] }),
     assessment: one(assessments, { fields: [escalations.assessmentId], references: [assessments.id] }),
     escalatedBy: one(users, { fields: [escalations.escalatedBy], references: [users.id] }),
+}));
+
+export const socialSignalRelations = relations(socialSignals, ({ one }) => ({
+    relatedSignal: one(signals, { fields: [socialSignals.relatedSignalId], references: [signals.id] }),
+    promotedBy: one(users, { fields: [socialSignals.promotedBy], references: [users.id] }),
 }));

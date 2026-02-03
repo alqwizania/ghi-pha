@@ -5,6 +5,7 @@ import AssessmentView from './views/AssessmentView';
 import EscalationView from './views/EscalationView';
 import LoginView from './views/LoginView';
 import UserManagement from './views/UserManagement';
+import ListenerView from './views/ListenerView';
 
 const GHICLogo = () => (
   <div className="relative flex items-center justify-center group">
@@ -38,6 +39,10 @@ const AssessmentIcon = () => (
 
 const EscalationIcon = () => (
   <svg className="w-5 h-5 lg:w-6 lg:h-6 text-ghi-critical" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+);
+
+const ListenerIcon = () => (
+  <svg className="w-5 h-5 lg:w-6 lg:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" /></svg>
 );
 
 function App() {
@@ -75,6 +80,7 @@ function App() {
 
   const navItems = [
     { id: 'dashboard', label: 'DASHBOARD', icon: <DashboardIcon /> },
+    { id: 'listener', label: 'LISTENER', icon: <ListenerIcon /> },
     { id: 'triage', label: 'TRIAGE', icon: <TriageIcon /> },
     { id: 'assessments', label: 'ASSESSMENTS', icon: <AssessmentIcon /> },
     { id: 'escalations', label: 'ESCALATIONS', icon: <EscalationIcon /> },
@@ -189,6 +195,7 @@ function App() {
 
           <div className="relative z-10 flex-1">
             {activeView === 'dashboard' && <Dashboard />}
+            {activeView === 'listener' && <ListenerView user={user} />}
             {activeView === 'triage' && <Triage user={user} />}
             {activeView === 'assessments' && <AssessmentView user={user} />}
             {activeView === 'escalations' && <EscalationView />}

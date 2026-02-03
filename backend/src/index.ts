@@ -4,7 +4,7 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from './db/schema';
 import { eq, desc } from 'drizzle-orm';
-// import { BeaconCollector } from './services/beacon-collector';
+import { BeaconCollector } from './services/beacon-collector';
 import { sign } from 'hono/jwt';
 
 type Bindings = {
@@ -261,15 +261,110 @@ app.get('/api/v1/escalations', async (c) => {
     return c.json(result);
 });
 
+// --- SOCIAL LISTENER ---
+
+app.get('/api/v1/social-signals', async (c) => {
+    const db = getDB(c.env.HYPERDRIVE);
+    const result = await db.query.socialSignals.findMany({
+        orderBy: [desc(schema.socialSignals.postedAt)],
+        where: eq(schema.socialSignals.isDismissed, false)
+    });
+    return c.json(result);
+});
+
+app.get('/api/v1/social-signals/:id', async (c) => {
+    const id = c.req.param('id');
+    const db = getDB(c.env.HYPERDRIVE);
+    const result = await db.query.socialSignals.findFirst({
+        where: eq(schema.socialSignals.id, id)
+    });
+    if (!result) return c.json({ error: 'Social signal not found' }, 404);
+    return c.json(result);
+});
+
+app.post('/api/v1/social-signals/:id/promote', async (c) => {
+    const id = c.req.param('id');
+    const body = await c.req.json();
+    const db = getDB(c.env.HYPERDRIVE);
+
+    // Get the social signal
+    const socialSignal = await db.query.socialSignals.findFirst({
+        where: eq(schema.socialSignals.id, id)
+    });
+
+    if (!socialSignal) return c.json({ error: 'Social signal not found' }, 404);
+
+    // Create a new signal from the social signal
+    const [newSignal] = await db.insert(schema.signals).values({
+        sourceUrl: socialSignal.urls && Array.isArray(socialSignal.urls) && socialSignal.urls.length > 0
+            ? socialSignal.urls[0]
+            : `https://twitter.com/${socialSignal.authorHandle}/status/${socialSignal.postId}`,
+        rawData: {
+            source: 'social_listener',
+            originalPost: socialSignal.content,
+            author: socialSignal.author,
+            engagement: socialSignal.engagement
+        },
+        disease: body.disease || 'Unknown',
+        country: body.country || socialSignal.location || 'Unknown',
+        location: socialSignal.location,
+        dateReported: new Date().toISOString().split('T')[0],
+        description: socialSignal.content,
+        priorityScore: socialSignal.relevanceScore,
+        triageStatus: 'Pending Triage',
+        currentStatus: 'New'
+    }).returning();
+
+    // Update social signal to mark as promoted
+    await db.update(schema.socialSignals)
+        .set({
+            relatedSignalId: newSignal.id,
+            promotedAt: new Date(),
+            promotedBy: body.userId || null,
+            verificationStatus: 'Promoted',
+            updatedAt: new Date()
+        })
+        .where(eq(schema.socialSignals.id, id));
+
+    return c.json({ success: true, signalId: newSignal.id });
+});
+
+app.post('/api/v1/social-signals/:id/dismiss', async (c) => {
+    const id = c.req.param('id');
+    const db = getDB(c.env.HYPERDRIVE);
+
+    await db.update(schema.socialSignals)
+        .set({ isDismissed: true, updatedAt: new Date() })
+        .where(eq(schema.socialSignals.id, id));
+
+    return c.json({ success: true });
+});
+
+app.get('/api/v1/monitored-accounts', async (c) => {
+    const db = getDB(c.env.HYPERDRIVE);
+    const result = await db.query.monitoredAccounts.findMany({
+        where: eq(schema.monitoredAccounts.isActive, true),
+        orderBy: [schema.monitoredAccounts.priority]
+    });
+    return c.json(result);
+});
+
+app.get('/api/v1/listener-keywords', async (c) => {
+    const db = getDB(c.env.HYPERDRIVE);
+    const result = await db.query.listenerKeywords.findMany({
+        where: eq(schema.listenerKeywords.isActive, true)
+    });
+    return c.json(result);
+});
+
 // --- WORKER ---
+
 
 export default {
     fetch: app.fetch,
-    /*
     async scheduled(event: any, env: Bindings, ctx: ExecutionContext) {
         const db = getDB(env.HYPERDRIVE);
         const collector = new BeaconCollector(db);
         ctx.waitUntil(collector.collect());
     },
-    */
 };
