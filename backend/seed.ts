@@ -24,7 +24,32 @@ async function seed() {
         fullName: 'System Administrator',
         role: 'Admin',
         passwordHash: 'admin123',
-        isActive: true
+        isActive: true,
+        permissions: {
+            dashboard: 'view',
+            listener: 'view',
+            triage: 'view',
+            assessment: 'view',
+            escalation: 'view'
+        }
+    }).onConflictDoNothing();
+
+    console.log("Seeding superadmin user...");
+
+    await db.insert(schema.users).values({
+        username: 'superadmin',
+        email: 'superadmin@pha.gov.sa',
+        fullName: 'Global Director',
+        role: 'Superadmin',
+        passwordHash: 'super123',
+        isActive: true,
+        permissions: {
+            dashboard: 'view',
+            listener: 'view',
+            triage: 'view',
+            assessment: 'view',
+            escalation: 'view'
+        }
     }).onConflictDoNothing();
 
     console.log("Seeding monitored accounts...");

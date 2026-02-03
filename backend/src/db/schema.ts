@@ -91,6 +91,7 @@ export const users = pgTable("users", {
     passwordHash: text("password_hash").notNull(),
     permissions: jsonb("permissions").default({
         dashboard: 'view',
+        listener: 'view',
         triage: 'view',
         assessment: 'view',
         escalation: 'view'

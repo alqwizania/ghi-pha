@@ -15,6 +15,7 @@ const UserManagement = () => {
         role: 'Analyst',
         permissions: {
             dashboard: 'view',
+            listener: 'view',
             triage: 'view',
             assessment: 'view',
             escalation: 'view'
@@ -48,6 +49,7 @@ const UserManagement = () => {
                 role: 'Analyst',
                 permissions: {
                     dashboard: 'view',
+                    listener: 'view',
                     triage: 'view',
                     assessment: 'view',
                     escalation: 'view'

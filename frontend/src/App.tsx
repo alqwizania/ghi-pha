@@ -78,13 +78,18 @@ function App() {
     }} />;
   }
 
-  const navItems = [
+  const allNavItems = [
     { id: 'dashboard', label: 'DASHBOARD', icon: <DashboardIcon /> },
     { id: 'listener', label: 'LISTENER', icon: <ListenerIcon /> },
     { id: 'triage', label: 'TRIAGE', icon: <TriageIcon /> },
     { id: 'assessments', label: 'ASSESSMENTS', icon: <AssessmentIcon /> },
     { id: 'escalations', label: 'ESCALATIONS', icon: <EscalationIcon /> },
   ];
+
+  const navItems = allNavItems.filter(item => {
+    if (user.role === 'Superadmin') return true;
+    return user.permissions?.[item.id] !== undefined;
+  });
 
   const canSeePersonnel = user.role === 'Director' || user.role === 'Superadmin' || user.role === 'Admin';
   if (canSeePersonnel) {
