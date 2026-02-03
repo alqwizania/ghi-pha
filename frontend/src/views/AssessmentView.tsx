@@ -74,9 +74,9 @@ const AssessmentView = ({ user }: any) => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {assessments.map(a => (
                 <button key={a.id} onClick={() => selectAssessment(a)} className="glass-panel p-6 text-left hover:border-ghi-teal/30 transition-all group">
-                    <p className="text-[10px] font-black text-ghi-teal uppercase mb-2">Signal ID: {a.signal.id.slice(0, 8)}</p>
+                    <p className="text-[11px] font-black text-ghi-teal uppercase mb-2">Signal ID: {a.signal.id.slice(0, 8)}</p>
                     <h3 className="text-white font-black uppercase tracking-wider mb-4">{a.signal.disease}</h3>
-                    <p className="text-slate-500 text-[9px] uppercase font-black">Status: {a.status}</p>
+                    <p className="text-slate-500 text-[10px] uppercase font-black">Status: {a.status}</p>
                 </button>
             ))}
         </div>
@@ -95,26 +95,26 @@ const AssessmentView = ({ user }: any) => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 text-slate-100 animate-in fade-in slide-in-from-right-4 duration-1000">
             {/* Left: Signal Summary */}
             <div className="lg:col-span-3 space-y-6">
-                <button onClick={() => setSelectedId(null)} className="flex items-center gap-2 text-[9px] font-black text-slate-500 hover:text-ghi-teal transition-colors uppercase tracking-widest mb-4">
+                <button onClick={() => setSelectedId(null)} className="flex items-center gap-2 text-[11px] font-black text-slate-500 hover:text-ghi-teal transition-colors uppercase tracking-widest mb-4">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
                     Back to Queue
                 </button>
 
                 <div className="glass-panel p-6 rounded-3xl border border-ghi-blue/10 bg-ghi-teal/[0.02]">
-                    <h4 className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-4">Active Signal</h4>
+                    <h4 className="text-[11px] font-black text-slate-500 uppercase tracking-widest mb-4">Active Signal</h4>
                     <h3 className="text-xl font-black text-white mb-1 uppercase">{activeA.signal.disease}</h3>
-                    <p className="text-ghi-teal font-black text-[10px] uppercase tracking-widest mb-4">{activeA.signal.country}</p>
-                    <p className="text-slate-400 text-[10px] leading-relaxed italic">"{activeA.signal.description.slice(0, 100)}..."</p>
+                    <p className="text-ghi-teal font-black text-[11px] uppercase tracking-widest mb-4">{activeA.signal.country}</p>
+                    <p className="text-slate-400 text-[11px] leading-relaxed italic">"{activeA.signal.description.slice(0, 100)}..."</p>
                 </div>
 
                 <div className="glass-panel p-6 rounded-3xl border border-ghi-blue/10">
-                    <h4 className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-6">Risk Calibration</h4>
+                    <h4 className="text-[11px] font-black text-slate-500 uppercase tracking-widest mb-6">Risk Calibration</h4>
                     <div className="space-y-4">
                         {['Low', 'Moderate', 'High', 'Critical'].map(level => (
                             <button
                                 key={level}
                                 onClick={() => setRraData({ ...rraData, riskLevel: level })}
-                                className={`w-full py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all ${rraData.riskLevel === level
+                                className={`w-full py-2 rounded-xl text-[11px] font-black uppercase tracking-widest border transition-all ${rraData.riskLevel === level
                                     ? (level === 'Critical' ? 'bg-ghi-critical text-white border-ghi-critical shadow-[0_0_15px_rgba(255,49,49,0.3)]' : 'bg-ghi-teal text-ghi-navy border-ghi-teal')
                                     : 'bg-white/5 text-slate-500 border-white/5 hover:border-white/20'}`}
                             >
@@ -141,10 +141,10 @@ const AssessmentView = ({ user }: any) => {
                             { id: 'q4', text: 'Risk of travel/trade restrictions?' },
                         ].map((q) => (
                             <div key={q.id} className="p-4 bg-white/[0.02] rounded-2xl border border-white/5 flex justify-between items-center">
-                                <p className="text-[10px] font-black text-slate-400 uppercase max-w-[150px] leading-tight">{q.text}</p>
+                                <p className="text-[11px] font-black text-slate-400 uppercase max-w-[150px] leading-tight">{q.text}</p>
                                 <div className="flex gap-2">
-                                    <button onClick={() => handleIhr(q.id, true)} className={`w-10 h-8 rounded-lg text-[9px] font-black border transition-all ${ihrAnswers[q.id] === true ? 'bg-ghi-critical/20 text-ghi-critical border-ghi-critical/50' : 'bg-white/5 text-slate-600 border-white/5'}`}>YES</button>
-                                    <button onClick={() => handleIhr(q.id, false)} className={`w-10 h-8 rounded-lg text-[9px] font-black border transition-all ${ihrAnswers[q.id] === false ? 'bg-ghi-teal/20 text-ghi-teal border-ghi-teal/50' : 'bg-white/5 text-slate-600 border-white/5'}`}>NO</button>
+                                    <button onClick={() => handleIhr(q.id, true)} className={`w-10 h-8 rounded-lg text-[10px] font-black border transition-all ${ihrAnswers[q.id] === true ? 'bg-ghi-critical/20 text-ghi-critical border-ghi-critical/50' : 'bg-white/5 text-slate-600 border-white/5'}`}>YES</button>
+                                    <button onClick={() => handleIhr(q.id, false)} className={`w-10 h-8 rounded-lg text-[10px] font-black border transition-all ${ihrAnswers[q.id] === false ? 'bg-ghi-teal/20 text-ghi-teal border-ghi-teal/50' : 'bg-white/5 text-slate-600 border-white/5'}`}>NO</button>
                                 </div>
                             </div>
                         ))}
@@ -152,7 +152,7 @@ const AssessmentView = ({ user }: any) => {
 
                     <div className="mt-6 flex items-center gap-4 p-4 rounded-2xl bg-white/[0.01] border border-dashed border-white/10">
                         <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-xs ${yesCount >= 2 ? 'bg-ghi-critical/20 text-ghi-critical' : 'bg-ghi-teal/20 text-ghi-teal'}`}>{yesCount}</div>
-                        <p className="text-[9px] font-black uppercase text-slate-500 tracking-widest">
+                        <p className="text-[11px] font-black uppercase text-slate-500 tracking-widest">
                             {yesCount >= 2 ? 'Threshold met for mandatory notification' : 'Signals do not meet notification criteria'}
                         </p>
                     </div>
@@ -167,7 +167,7 @@ const AssessmentView = ({ user }: any) => {
                     <div className="space-y-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="space-y-2">
-                                <label className="text-[8px] font-black text-slate-500 uppercase tracking-widest ml-2">Hazard Assessment</label>
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2">Hazard Assessment</label>
                                 <textarea
                                     value={rraData.hazard}
                                     onChange={e => setRraData({ ...rraData, hazard: e.target.value })}
@@ -176,7 +176,7 @@ const AssessmentView = ({ user }: any) => {
                                 />
                             </div>
                             <div className="space-y-2">
-                                <label className="text-[8px] font-black text-slate-500 uppercase tracking-widest ml-2">Exposure Assessment</label>
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2">Exposure Assessment</label>
                                 <textarea
                                     value={rraData.exposure}
                                     onChange={e => setRraData({ ...rraData, exposure: e.target.value })}
@@ -186,7 +186,7 @@ const AssessmentView = ({ user }: any) => {
                             </div>
                         </div>
                         <div className="space-y-2">
-                            <label className="text-[8px] font-black text-slate-500 uppercase tracking-widest ml-2">Contextual Factors</label>
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2">Contextual Factors</label>
                             <textarea
                                 value={rraData.context}
                                 onChange={e => setRraData({ ...rraData, context: e.target.value })}

@@ -41,7 +41,10 @@ const EscalationIcon = () => (
 );
 
 function App() {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<any>(() => {
+    const saved = localStorage.getItem('ghi_session');
+    return saved ? JSON.parse(saved) : null;
+  });
   const [activeView, setActiveView] = useState(() => {
     const path = window.location.pathname.replace('/', '');
     return path || 'dashboard';
@@ -64,7 +67,10 @@ function App() {
   };
 
   if (!user) {
-    return <LoginView onLogin={(userData) => setUser(userData)} />;
+    return <LoginView onLogin={(userData) => {
+      setUser(userData);
+      localStorage.setItem('ghi_session', JSON.stringify(userData));
+    }} />;
   }
 
   const navItems = [
@@ -81,31 +87,36 @@ function App() {
 
   const handleLogout = () => {
     setUser(null);
+    localStorage.removeItem('ghi_session');
     window.history.pushState({}, '', '/');
   };
 
   return (
     <div className="flex h-screen w-screen bg-ghi-navy text-slate-100 overflow-hidden font-din flex-col lg:flex-row">
       {/* Mobile Header */}
-      <header className="lg:hidden flex items-center justify-between px-6 py-4 bg-ghi-navy/50 backdrop-blur-md border-b border-white/5 z-50">
-        <div className="flex items-center gap-3">
+      <header className="lg:hidden grid grid-cols-3 items-center px-6 py-4 bg-ghi-navy/90 backdrop-blur-md border-b border-white/5 z-50 h-20">
+        <div className="flex justify-start items-center">
           <GHICLogo />
-          <span className="text-[10px] font-black tracking-widest text-white uppercase ml-4">{activeView}</span>
         </div>
-        <button
-          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-          className="p-2 text-ghi-teal hover:bg-ghi-teal/10 rounded-lg transition-colors"
-        >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={isSidebarOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"} />
-          </svg>
-        </button>
+        <div className="flex justify-center items-center overflow-hidden">
+          <span className="text-xs sm:text-sm font-black tracking-[0.2em] sm:tracking-[0.4em] text-white uppercase truncate">{activeView}</span>
+        </div>
+        <div className="flex justify-end items-center">
+          <button
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className="p-2 text-ghi-teal hover:bg-ghi-teal/10 rounded-lg transition-colors"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={isSidebarOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"} />
+            </svg>
+          </button>
+        </div>
       </header>
 
       {/* Sidebar / Overlay */}
       <aside className={`
         fixed inset-0 z-40 lg:relative lg:inset-auto
-        w-full lg:w-64 glass-panel flex flex-col border-r border-ghi-blue/10
+        w-full lg:w-64 bg-[#050505] flex flex-col border-r border-white/5
         transition-transform duration-500 lg:translate-x-0
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
@@ -113,16 +124,12 @@ function App() {
           <GHICLogo />
           <div className="text-center mt-2">
             <h1 className="text-xs font-black tracking-[0.2em] text-ghi-teal uppercase">Global Health</h1>
-            <h2 className="text-[10px] text-white font-black tracking-[0.4em] uppercase opacity-70">Intelligence</h2>
+            <h2 className="text-[11px] text-white font-black tracking-[0.4em] uppercase opacity-70">Intelligence</h2>
           </div>
         </div>
 
-        {/* Mobile Sidebar Logo */}
-        <div className="lg:hidden p-10 flex flex-col items-center gap-4 border-b border-white/5 bg-ghi-navy/30">
-          <GHICLogo />
-        </div>
 
-        <nav className="flex-1 mt-8 px-4 space-y-2 overflow-y-auto">
+        <nav className="flex-1 mt-24 lg:mt-8 px-4 space-y-2 overflow-y-auto">
           {navItems.map((item) => (
             <button
               key={item.id}
@@ -135,7 +142,7 @@ function App() {
               <div className={`${activeView === item.id ? 'text-ghi-teal' : 'text-slate-500 group-hover:text-ghi-teal'}`}>
                 {item.icon}
               </div>
-              <span className="text-[10px] font-bold tracking-widest uppercase">{item.label}</span>
+              <span className="text-xs font-bold tracking-widest uppercase">{item.label}</span>
             </button>
           ))}
         </nav>
@@ -150,10 +157,10 @@ function App() {
                 {user.fullName.split(' ').map((n: string) => n[0]).join('')}
               </div>
               <div className="flex-1 overflow-hidden">
-                <p className="text-[10px] font-black text-white uppercase truncate group-hover:text-ghi-critical transition-colors">{user.fullName}</p>
+                <p className="text-xs font-black text-white uppercase truncate group-hover:text-ghi-critical transition-colors">{user.fullName}</p>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-ghi-success shadow-[0_0_8px_rgba(57,255,20,0.5)]"></span>
-                  <p className="text-[9px] text-slate-500 uppercase font-black tracking-tighter">{user.role}</p>
+                  <p className="text-[12px] text-slate-500 uppercase font-black tracking-tighter">{user.role}</p>
                 </div>
               </div>
               <div className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -164,33 +171,39 @@ function App() {
         </div>
       </aside>
 
-      {/* Main Content */}
-      <main className="flex-1 overflow-y-auto bg-ghi-navy p-4 lg:p-8 relative flex flex-col min-h-0">
+      {/* View Container */}
+      <div className="flex-1 flex flex-col min-h-0 bg-ghi-navy relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,_rgba(0,242,255,0.05)_0%,_transparent_50%)] pointer-events-none"></div>
 
-        <header className="hidden lg:flex justify-between items-center mb-10 relative z-10 shrink-0">
-          <div>
-            <h2 className="text-2xl font-black text-white tracking-widest uppercase mb-1">{activeView}</h2>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-ghi-teal shadow-[0_0_8px_#00F2FF]"></div>
-              <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">Neural Link: <span className="text-ghi-teal">Active</span></p>
+        {/* Main Content Area */}
+        <main className="flex-1 overflow-y-auto p-4 lg:p-10 relative flex flex-col">
+          <header className="hidden lg:flex justify-between items-center mb-10 relative z-10 shrink-0">
+            <div>
+              <h2 className="text-2xl font-black text-white tracking-widest uppercase mb-1">{activeView}</h2>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-ghi-teal shadow-[0_0_8px_#00F2FF]"></div>
+                <p className="text-slate-500 text-[11px] font-bold uppercase tracking-widest">Neural Link: <span className="text-ghi-teal">Active</span></p>
+              </div>
             </div>
-          </div>
+          </header>
 
-          <div className="flex gap-6">
-            {/* Empty space or future dynamic alerts */}
+          <div className="relative z-10 flex-1">
+            {activeView === 'dashboard' && <Dashboard />}
+            {activeView === 'triage' && <Triage user={user} />}
+            {activeView === 'assessments' && <AssessmentView user={user} />}
+            {activeView === 'escalations' && <EscalationView />}
+            {activeView === 'users' && <UserManagement />}
           </div>
-        </header>
+        </main>
 
-        {/* View Content */}
-        <div className="relative z-10 flex-1 h-full">
-          {activeView === 'dashboard' && <Dashboard />}
-          {activeView === 'triage' && <Triage user={user} />}
-          {activeView === 'assessments' && <AssessmentView user={user} />}
-          {activeView === 'escalations' && <EscalationView />}
-          {activeView === 'users' && <UserManagement />}
-        </div>
-      </main>
+        {/* Global Fixed Footer */}
+        <footer className="shrink-0 flex flex-col sm:flex-row justify-between items-center px-4 lg:px-10 py-6 border-t border-white/5 bg-[#050505]/40 backdrop-blur-md relative z-20 gap-4">
+          <p className="text-slate-600 text-[9px] sm:text-[11px] font-black uppercase tracking-[0.2em] sm:tracking-[0.4em] text-center sm:text-left">
+            Public Health Authority, Global Health Department
+          </p>
+          <img src="/pha-logo.png" alt="PHA Logo" className="h-6 sm:h-8 opacity-80" />
+        </footer>
+      </div>
     </div>
   );
 }

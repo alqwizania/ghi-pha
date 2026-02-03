@@ -4,7 +4,7 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from './db/schema';
 import { eq, desc } from 'drizzle-orm';
-import { BeaconCollector } from './services/beacon-collector';
+// import { BeaconCollector } from './services/beacon-collector';
 import { sign } from 'hono/jwt';
 
 type Bindings = {
@@ -14,12 +14,30 @@ type Bindings = {
 
 const app = new Hono<{ Bindings: Bindings }>();
 
-// Enable CORS for frontend access
-app.use('*', cors({
-    origin: '*', // In production, this should be restricted to the frontend domain
-    allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowHeaders: ['Content-Type', 'Authorization'],
-}));
+// 1. ATOMIC CORS - SIMPLEST
+app.use('*', cors());
+
+// Diagnostic Endpoint
+app.get('/api/v1/ping', (c) => {
+    return c.json({
+        status: 'alive',
+        time: new Date().toISOString(),
+        instance: 'ghi-core (Ready)'
+    });
+});
+
+// Global Error Handler
+app.onError((err, c) => {
+    console.error('System Error:', err);
+    return c.json({
+        error: 'Terminal Error',
+        message: err.message,
+    }, 500);
+});
+
+app.notFound((c) => {
+    return c.json({ error: 'Endpoint Not Found' }, 404);
+});
 
 const getDB = (hyperdrive: Hyperdrive) => {
     const client = postgres(hyperdrive.connectionString);
@@ -29,15 +47,25 @@ const getDB = (hyperdrive: Hyperdrive) => {
 // --- AUTH ---
 
 app.post('/api/v1/auth/login', async (c) => {
+    console.log('Login attempt');
     try {
-        const { email, password } = await c.req.json();
+        const body = await c.req.json();
+        const { email, password } = body;
+        console.log(`Login payload for: ${email}`);
+
         const db = getDB(c.env.HYPERDRIVE);
 
         const user = await db.query.users.findFirst({
             where: eq(schema.users.email, email)
         });
 
-        if (!user || user.passwordHash !== password) {
+        if (!user) {
+            console.log(`User not found: ${email}`);
+            return c.json({ error: 'Invalid credentials' }, 401);
+        }
+
+        if (user.passwordHash !== password) {
+            console.log(`Password mismatch for: ${email}`);
             return c.json({ error: 'Invalid credentials' }, 401);
         }
 
@@ -88,7 +116,7 @@ app.post('/api/v1/users', async (c) => {
             email: body.email,
             fullName: body.fullName,
             role: body.role || 'Analyst',
-            passwordHash: body.password, // In real app, hash this!
+            passwordHash: body.password || 'password123',
             permissions: body.permissions || {
                 dashboard: 'view',
                 triage: 'view',
@@ -206,13 +234,20 @@ app.put('/api/v1/users/:id', async (c) => {
     const body = await c.req.json();
     const db = getDB(c.env.HYPERDRIVE);
 
+    const updateData: any = {
+        fullName: body.fullName,
+        email: body.email,
+        role: body.role,
+        permissions: body.permissions,
+        updatedAt: new Date()
+    };
+
+    if (body.password) {
+        updateData.passwordHash = body.password;
+    }
+
     await db.update(schema.users)
-        .set({
-            fullName: body.fullName,
-            role: body.role,
-            permissions: body.permissions,
-            updatedAt: new Date()
-        })
+        .set(updateData)
         .where(eq(schema.users.id, id));
 
     return c.json({ success: true });
@@ -230,9 +265,11 @@ app.get('/api/v1/escalations', async (c) => {
 
 export default {
     fetch: app.fetch,
+    /*
     async scheduled(event: any, env: Bindings, ctx: ExecutionContext) {
         const db = getDB(env.HYPERDRIVE);
         const collector = new BeaconCollector(db);
         ctx.waitUntil(collector.collect());
     },
+    */
 };

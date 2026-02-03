@@ -33,7 +33,7 @@ const EscalationView = () => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 text-slate-100 animate-in fade-in slide-in-from-top-4 duration-1000">
             {/* Left: Escalation List */}
             <div className="lg:col-span-4 space-y-4 overflow-y-auto max-h-[calc(100vh-200px)] pr-2">
-                <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-4 ml-2">Escalation Queue</h4>
+                <h4 className="text-[11px] font-black text-slate-500 uppercase tracking-[0.3em] mb-4 ml-2">Escalation Queue</h4>
                 {escalations.map(e => (
                     <button
                         key={e.id}
@@ -41,13 +41,13 @@ const EscalationView = () => {
                         className={`w-full glass-panel p-6 text-left border transition-all rounded-3xl ${selectedId === e.id ? 'border-ghi-critical/50 bg-ghi-critical/5' : 'border-white/5 hover:border-white/20'}`}
                     >
                         <div className="flex justify-between items-start mb-2">
-                            <span className={`px-2 py-0.5 rounded-lg text-[8px] font-black uppercase ${e.priority === 'Critical' ? 'bg-ghi-critical/20 text-ghi-critical' : 'bg-ghi-warning/20 text-ghi-warning'}`}>
+                            <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black uppercase ${e.priority === 'Critical' ? 'bg-ghi-critical/20 text-ghi-critical' : 'bg-ghi-warning/20 text-ghi-warning'}`}>
                                 {e.priority}
                             </span>
-                            <span className="text-[8px] text-slate-600 font-bold">{new Date(e.escalatedAt).toLocaleDateString()}</span>
+                            <span className="text-[10px] text-slate-600 font-bold">{new Date(e.escalatedAt).toLocaleDateString()}</span>
                         </div>
                         <h3 className="text-sm font-black text-white uppercase tracking-wider">{e.signal?.disease}</h3>
-                        <p className="text-[9px] text-slate-500 uppercase font-black mt-1">{e.signal?.country}</p>
+                        <p className="text-[10px] text-slate-500 uppercase font-black mt-1">{e.signal?.country}</p>
                     </button>
                 ))}
             </div>
@@ -65,10 +65,10 @@ const EscalationView = () => {
 
                     <div className="relative z-10">
                         <div className="flex flex-wrap items-center gap-4 mb-8">
-                            <span className="px-4 py-1.5 rounded-full bg-ghi-critical/10 text-ghi-critical text-[10px] font-black uppercase tracking-[0.2em] border border-ghi-critical/30 shadow-[0_0_15px_rgba(255,49,49,0.1)]">
+                            <span className="px-4 py-1.5 rounded-full bg-ghi-critical/10 text-ghi-critical text-[11px] font-black uppercase tracking-[0.2em] border border-ghi-critical/30 shadow-[0_0_15px_rgba(255,49,49,0.1)]">
                                 Strategic Briefing
                             </span>
-                            <span className="text-slate-500 text-[9px] font-black uppercase tracking-widest">Signal ID: EVT-{activeE.signal?.id.slice(0, 8)}</span>
+                            <span className="text-slate-500 text-[10px] font-black uppercase tracking-widest">Signal ID: EVT-{activeE.signal?.id.slice(0, 8)}</span>
                         </div>
 
                         <h2 className="text-3xl lg:text-5xl font-black text-white mb-4 uppercase tracking-tighter leading-none">
@@ -78,7 +78,7 @@ const EscalationView = () => {
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 py-10 border-y border-white/5 mb-10">
                             <div className="space-y-6">
-                                <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">IHR Matrix Data</h4>
+                                <h4 className="text-[11px] font-black text-slate-500 uppercase tracking-widest">IHR Matrix Data</h4>
                                 <div className="space-y-3">
                                     {[
                                         { label: 'Public Health Impact', value: 'Serious' },
@@ -89,17 +89,17 @@ const EscalationView = () => {
                                             <div className="w-4 h-4 rounded-full bg-ghi-success/20 flex items-center justify-center text-ghi-success">
                                                 <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
                                             </div>
-                                            <p className="text-[10px] font-black text-white uppercase tracking-widest">{item.label}: {item.value}</p>
+                                            <p className="text-[11px] font-black text-white uppercase tracking-widest">{item.label}: {item.value}</p>
                                         </div>
                                     ))}
                                 </div>
                             </div>
 
                             <div className="space-y-6">
-                                <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">RRA Findings</h4>
+                                <h4 className="text-[11px] font-black text-slate-500 uppercase tracking-widest">RRA Findings</h4>
                                 <div className="p-4 bg-ghi-critical/5 rounded-2xl border border-ghi-critical/20">
-                                    <p className="text-[10px] font-black text-ghi-critical uppercase mb-1">Risk Directive</p>
-                                    <p className="text-[11px] text-white font-bold leading-relaxed">{activeE.escalationReason}</p>
+                                    <p className="text-[11px] font-black text-ghi-critical uppercase mb-1">Risk Directive</p>
+                                    <p className="text-[12px] text-white font-bold leading-relaxed">{activeE.escalationReason}</p>
                                 </div>
                             </div>
                         </div>
@@ -108,16 +108,16 @@ const EscalationView = () => {
                             <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Recommended Actions</h4>
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                 <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 text-center">
-                                    <p className="text-[8px] font-black text-slate-600 uppercase mb-1">Global</p>
-                                    <p className="text-[9px] font-black text-white uppercase italic">Notify WHO</p>
+                                    <p className="text-[10px] font-black text-slate-600 uppercase mb-1">Global</p>
+                                    <p className="text-[11px] font-black text-white uppercase italic">Notify WHO</p>
                                 </div>
                                 <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 text-center">
-                                    <p className="text-[8px] font-black text-slate-600 uppercase mb-1">National</p>
-                                    <p className="text-[9px] font-black text-white uppercase italic">Deploy RRT</p>
+                                    <p className="text-[10px] font-black text-slate-600 uppercase mb-1">National</p>
+                                    <p className="text-[11px] font-black text-white uppercase italic">Deploy RRT</p>
                                 </div>
                                 <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 text-center">
-                                    <p className="text-[8px] font-black text-slate-600 uppercase mb-1">Borders</p>
-                                    <p className="text-[9px] font-black text-white uppercase italic">Travel Alert</p>
+                                    <p className="text-[10px] font-black text-slate-600 uppercase mb-1">Borders</p>
+                                    <p className="text-[11px] font-black text-white uppercase italic">Travel Alert</p>
                                 </div>
                             </div>
                         </div>
