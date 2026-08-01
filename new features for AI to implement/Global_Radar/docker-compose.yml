@@ -1,0 +1,67 @@
+# /srv/docker/health-agents/docker-compose.yml
+# SehaRadar v1.0 - Health Surveillance System
+services:
+  seha-radar:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: seha-radar:latest
+    container_name: seha-radar
+    restart: unless-stopped
+    
+    # No port mapping - accessed via reverse proxy only
+    # https://seha-radar.fayaa92.sa/dashboard
+    # https://seha-radar.fayaa92.sa/logs
+    
+    networks:
+      - caddy_default
+    
+    env_file:
+      - .env
+    
+    volumes:
+      # Mount docker socket for dashboard log streaming
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Persistent SehaRadar app data (including syncdetection queue DB)
+      - /srv/data/seharadar:/data
+    
+    depends_on:
+      rsshub:
+        condition: service_healthy
+    
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8080/status', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  rsshub:
+    image: diygod/rsshub:latest
+    container_name: seha-rsshub
+    restart: unless-stopped
+    
+    networks:
+      - caddy_default
+    
+    environment:
+      ACCESS_KEY: ${RSSHUB_ACCESS_KEY:-}
+      CACHE_EXPIRE: ${RSSHUB_CACHE_EXPIRE:-300}
+      CACHE_TYPE: memory
+      REQUEST_TIMEOUT: ${RSSHUB_REQUEST_TIMEOUT:-30000}
+      RATE_LIMIT_MAX: 100
+      UA: "SehaRadar/1.0 RSSHub (+https://seha-radar.fayaa92.sa)"
+      REQUEST_RETRY: 3
+      NODE_ENV: production
+      LOG_LEVEL: info
+    
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:1200/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+networks:
+  caddy_default:
+    external: true

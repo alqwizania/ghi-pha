@@ -168,3 +168,14 @@ Thumbs.db
 # Project specific
 backend/ghi_system.db
 backend/.env
+
+# Secrets — these hold live database credentials, never commit
+.dev.vars
+**/.dev.vars
+
+# Wrangler local build output and state
+.wrangler/
+**/.wrangler/
+
+# Local throwaway scripts
+scratch/

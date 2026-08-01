@@ -1,0 +1,56 @@
+{
+  "WHO": {
+    "name": "WHO Health Surveillance Agent",
+    "agency": "World Health Organization",
+    "sources": [
+      "https://www.who.int/emergencies/disease-outbreak-news",
+      "https://www.who.int/news"
+    ],
+    "searchQueries": [
+      "WHO disease outbreak latest",
+      "WHO epidemiological bulletin today",
+      "WHO emergency response latest",
+      "WHO surveillance report recent"
+    ],
+    "keywords": ["outbreak", "epidemic", "surveillance", "emergency", "MERS", "mpox", "influenza", "cholera", "ebola", "cases", "deaths"]
+  },
+  "CDC": {
+    "name": "CDC Health Surveillance Agent",
+    "agency": "Centers for Disease Control and Prevention",
+    "sources": [
+      "https://www.cdc.gov/outbreaks/",
+      "https://emergency.cdc.gov/"
+    ],
+    "searchQueries": [
+      "CDC outbreak updates today",
+      "CDC health alert network latest",
+      "CDC MMWR recent reports",
+      "CDC emergency response latest"
+    ],
+    "keywords": ["outbreak", "cases", "infection", "disease", "surveillance", "MMWR", "health alert", "epidemic", "mpox", "influenza", "respiratory illness"]
+  },
+  "PLACEHOLDER_1": {
+    "name": "Placeholder Agent 1",
+    "agency": "Reserved for future use",
+    "sources": [
+      "https://example.com/placeholder1"
+    ],
+    "searchQueries": [
+      "placeholder query 1"
+    ],
+    "keywords": ["placeholder"],
+    "enabled": false
+  },
+  "PLACEHOLDER_2": {
+    "name": "Placeholder Agent 2",
+    "agency": "Reserved for future use",
+    "sources": [
+      "https://example.com/placeholder2"
+    ],
+    "searchQueries": [
+      "placeholder query 2"
+    ],
+    "keywords": ["placeholder"],
+    "enabled": false
+  }
+}

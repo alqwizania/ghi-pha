@@ -1,10 +1,10 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { login } from '../lib/api';
 
 const LoginView = ({ onLogin }: { onLogin: (user: any) => void }) => {
     const [isScanning, setIsScanning] = useState(false);
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
+    const [email, setEmail] = useState('arqwizani@pha.gov.sa');
+    const [password, setPassword] = useState('arqwizani@pha.gov.sa');
     const [error, setError] = useState('');
 
     const handleLogin = async (e: React.FormEvent) => {
@@ -107,7 +107,7 @@ const LoginView = ({ onLogin }: { onLogin: (user: any) => void }) => {
                             {isScanning && (
                                 <div className="absolute inset-0 flex items-center justify-center">
                                     <div className="w-full h-[2px] bg-ghi-teal animate-[scan_2s_infinite] shadow-[0_0_15px_#00F2FF]"></div>
-                                    <span className="absolute inset-0 flex items-center justify-center text-[8px] animate-pulse">Syncing Neural Link...</span>
+                                    <span className="absolute inset-0 flex items-center justify-center text-[8px] animate-pulse">Authenticating Session...</span>
                                 </div>
                             )}
                         </button>

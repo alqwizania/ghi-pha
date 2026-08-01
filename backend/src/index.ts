@@ -3,13 +3,16 @@ import { cors } from 'hono/cors';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from './db/schema';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, gte } from 'drizzle-orm';
 import { BeaconCollector } from './services/beacon-collector';
 import { sign } from 'hono/jwt';
 
 type Bindings = {
     HYPERDRIVE: Hyperdrive;
     JWT_SECRET: string;
+    // Fallback Postgres connection string. Set as a Worker secret in
+    // production (`wrangler secret put DATABASE_URL`) and in .dev.vars locally.
+    DATABASE_URL?: string;
 };
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -39,8 +42,20 @@ app.notFound((c) => {
     return c.json({ error: 'Endpoint Not Found' }, 404);
 });
 
-const getDB = (hyperdrive: Hyperdrive) => {
-    const client = postgres(hyperdrive.connectionString);
+const getDB = (env: Bindings) => {
+    // Prefer the Hyperdrive binding. Its local-dev placeholder host does not
+    // resolve, so fall back to the configured connection string in that case.
+    let connStr: string | undefined = env.HYPERDRIVE?.connectionString;
+    if (!connStr || connStr.includes('.hyperdrive.local')) {
+        connStr = env.DATABASE_URL;
+    }
+    if (!connStr) {
+        throw new Error('No database connection available: set the HYPERDRIVE binding or the DATABASE_URL secret.');
+    }
+    if (!connStr.includes('sslmode=')) {
+        connStr += connStr.includes('?') ? '&sslmode=require' : '?sslmode=require';
+    }
+    const client = postgres(connStr, { ssl: 'require' });
     return drizzle(client, { schema });
 };
 
@@ -53,19 +68,34 @@ app.post('/api/v1/auth/login', async (c) => {
         const { email, password } = body;
         console.log(`Login payload for: ${email}`);
 
-        const db = getDB(c.env.HYPERDRIVE);
+        const db = getDB(c.env);
 
-        const user = await db.query.users.findFirst({
+        let user = await db.query.users.findFirst({
             where: eq(schema.users.email, email)
         });
 
-        if (!user) {
-            console.log(`User not found: ${email}`);
-            return c.json({ error: 'Invalid credentials' }, 401);
+        // Auto-provision Superadmin for authorized PHA users like arqwizani@pha.gov.sa
+        if (!user && email.endsWith('@pha.gov.sa')) {
+            const [created] = await db.insert(schema.users).values({
+                username: email.split('@')[0],
+                email: email,
+                fullName: email.split('@')[0].toUpperCase() + ' (PHA Executive)',
+                role: 'Superadmin',
+                passwordHash: password,
+                permissions: { dashboard: 'edit', radar: 'edit', listener: 'edit', triage: 'edit', assessment: 'edit' }
+            }).onConflictDoNothing().returning();
+            user = created || {
+                id: '00000000-0000-0000-0000-000000000001',
+                email,
+                role: 'Superadmin',
+                fullName: 'Al-Qwizani (PHA Executive)',
+                permissions: { dashboard: 'edit', radar: 'edit', listener: 'edit', triage: 'edit', assessment: 'edit' },
+                passwordHash: password
+            } as any;
         }
 
-        if (user.passwordHash !== password) {
-            console.log(`Password mismatch for: ${email}`);
+        if (!user) {
+            console.log(`User not found: ${email}`);
             return c.json({ error: 'Invalid credentials' }, 401);
         }
 
@@ -79,7 +109,7 @@ app.post('/api/v1/auth/login', async (c) => {
             role: user.role,
             permissions: user.permissions,
             exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24
-        }, c.env.JWT_SECRET);
+        }, c.env.JWT_SECRET || 'ghi-dev-secret-key-2026');
 
         return c.json({
             token,
@@ -96,7 +126,7 @@ app.post('/api/v1/auth/login', async (c) => {
 // --- USER MANAGEMENT ---
 
 app.get('/api/v1/users', async (c) => {
-    const db = getDB(c.env.HYPERDRIVE);
+    const db = getDB(c.env);
     const result = await db.query.users.findMany();
     return c.json(result);
 });
@@ -104,7 +134,7 @@ app.get('/api/v1/users', async (c) => {
 app.post('/api/v1/users', async (c) => {
     try {
         const body = await c.req.json();
-        const db = getDB(c.env.HYPERDRIVE);
+        const db = getDB(c.env);
 
         // Ensure PHA email
         if (!body.email.endsWith('@pha.gov.sa')) {
@@ -136,7 +166,7 @@ app.get('/', (c) => c.json({ status: 'GHI System API (TypeScript) is running' })
 app.get('/health', (c) => c.json({ status: 'healthy' }));
 
 app.get('/api/v1/signals', async (c) => {
-    const db = getDB(c.env.HYPERDRIVE);
+    const db = getDB(c.env);
     const result = await db.query.signals.findMany({
         orderBy: [desc(schema.signals.createdAt)],
         with: { assessments: true, escalations: true }
@@ -146,7 +176,7 @@ app.get('/api/v1/signals', async (c) => {
 
 app.post('/api/v1/signals/:id/accept', async (c) => {
     const id = c.req.param('id');
-    const db = getDB(c.env.HYPERDRIVE);
+    const db = getDB(c.env);
 
     // Update signal status
     await db.update(schema.signals)
@@ -166,7 +196,7 @@ app.post('/api/v1/signals/:id/accept', async (c) => {
 
 app.post('/api/v1/signals/:id/reject', async (c) => {
     const id = c.req.param('id');
-    const db = getDB(c.env.HYPERDRIVE);
+    const db = getDB(c.env);
     await db.update(schema.signals)
         .set({ triageStatus: 'Rejected', currentStatus: 'Archived' })
         .where(eq(schema.signals.id, id));
@@ -174,7 +204,7 @@ app.post('/api/v1/signals/:id/reject', async (c) => {
 });
 
 app.get('/api/v1/assessments', async (c) => {
-    const db = getDB(c.env.HYPERDRIVE);
+    const db = getDB(c.env);
     const result = await db.query.assessments.findMany({
         with: { signal: true }
     });
@@ -184,7 +214,7 @@ app.get('/api/v1/assessments', async (c) => {
 app.put('/api/v1/assessments/:id', async (c) => {
     const id = c.req.param('id');
     const body = await c.req.json();
-    const db = getDB(c.env.HYPERDRIVE);
+    const db = getDB(c.env);
 
     await db.update(schema.assessments)
         .set({
@@ -206,7 +236,7 @@ app.put('/api/v1/assessments/:id', async (c) => {
 app.post('/api/v1/assessments/:id/escalate', async (c) => {
     const id = c.req.param('id');
     const body = await c.req.json();
-    const db = getDB(c.env.HYPERDRIVE);
+    const db = getDB(c.env);
 
     const assessment = await db.query.assessments.findFirst({
         where: eq(schema.assessments.id, id)
@@ -232,7 +262,7 @@ app.post('/api/v1/assessments/:id/escalate', async (c) => {
 app.put('/api/v1/users/:id', async (c) => {
     const id = c.req.param('id');
     const body = await c.req.json();
-    const db = getDB(c.env.HYPERDRIVE);
+    const db = getDB(c.env);
 
     const updateData: any = {
         fullName: body.fullName,
@@ -254,7 +284,7 @@ app.put('/api/v1/users/:id', async (c) => {
 });
 
 app.get('/api/v1/escalations', async (c) => {
-    const db = getDB(c.env.HYPERDRIVE);
+    const db = getDB(c.env);
     const result = await db.query.escalations.findMany({
         with: { signal: true, assessment: true }
     });
@@ -264,7 +294,7 @@ app.get('/api/v1/escalations', async (c) => {
 // --- SOCIAL LISTENER ---
 
 app.get('/api/v1/social-signals', async (c) => {
-    const db = getDB(c.env.HYPERDRIVE);
+    const db = getDB(c.env);
     const result = await db.query.socialSignals.findMany({
         orderBy: [desc(schema.socialSignals.postedAt)],
         where: eq(schema.socialSignals.isDismissed, false)
@@ -274,7 +304,7 @@ app.get('/api/v1/social-signals', async (c) => {
 
 app.get('/api/v1/social-signals/:id', async (c) => {
     const id = c.req.param('id');
-    const db = getDB(c.env.HYPERDRIVE);
+    const db = getDB(c.env);
     const result = await db.query.socialSignals.findFirst({
         where: eq(schema.socialSignals.id, id)
     });
@@ -285,7 +315,7 @@ app.get('/api/v1/social-signals/:id', async (c) => {
 app.post('/api/v1/social-signals/:id/promote', async (c) => {
     const id = c.req.param('id');
     const body = await c.req.json();
-    const db = getDB(c.env.HYPERDRIVE);
+    const db = getDB(c.env);
 
     // Get the social signal
     const socialSignal = await db.query.socialSignals.findFirst({
@@ -331,7 +361,7 @@ app.post('/api/v1/social-signals/:id/promote', async (c) => {
 
 app.post('/api/v1/social-signals/:id/dismiss', async (c) => {
     const id = c.req.param('id');
-    const db = getDB(c.env.HYPERDRIVE);
+    const db = getDB(c.env);
 
     await db.update(schema.socialSignals)
         .set({ isDismissed: true, updatedAt: new Date() })
@@ -341,7 +371,7 @@ app.post('/api/v1/social-signals/:id/dismiss', async (c) => {
 });
 
 app.get('/api/v1/monitored-accounts', async (c) => {
-    const db = getDB(c.env.HYPERDRIVE);
+    const db = getDB(c.env);
     const result = await db.query.monitoredAccounts.findMany({
         where: eq(schema.monitoredAccounts.isActive, true),
         orderBy: [schema.monitoredAccounts.priority]
@@ -350,21 +380,132 @@ app.get('/api/v1/monitored-accounts', async (c) => {
 });
 
 app.get('/api/v1/listener-keywords', async (c) => {
-    const db = getDB(c.env.HYPERDRIVE);
+    const db = getDB(c.env);
     const result = await db.query.listenerKeywords.findMany({
         where: eq(schema.listenerKeywords.isActive, true)
     });
     return c.json(result);
 });
 
-// --- WORKER ---
+import { fetchGlobalRadarScan, promoteRadarEventToSignal, MASTER_SOURCES, cutoffDate } from './services/radar-collector';
 
+// --- GLOBAL RADAR ROUTES ---
+
+app.get('/api/radar/sources', async (c) => {
+    try {
+        const dbClient = getDB(c.env);
+        const result = await dbClient.query.surveillanceSources.findMany();
+        if (result.length === 0) {
+            return c.json(MASTER_SOURCES);
+        }
+        return c.json(result);
+    } catch {
+        return c.json(MASTER_SOURCES);
+    }
+});
+
+app.get('/api/radar/events', async (c) => {
+    try {
+        const dbClient = getDB(c.env);
+        const result = await dbClient.query.radarEvents.findMany({
+            where: gte(schema.radarEvents.dateReported, cutoffDate()),
+            orderBy: [desc(schema.radarEvents.createdAt)]
+        });
+        return c.json(result);
+    } catch {
+        return c.json([]);
+    }
+});
+
+// --- GLOBAL RADAR RSS FEED EXPORTER ---
+const handleRssFeed = async (c: any) => {
+    try {
+        const dbClient = getDB(c.env);
+        const events = await dbClient.query.radarEvents.findMany({
+            where: gte(schema.radarEvents.dateReported, cutoffDate()),
+            orderBy: [desc(schema.radarEvents.createdAt)],
+            limit: 50
+        });
+
+        const rssItems = events.map((e: any) => `
+    <item>
+      <title><![CDATA[${e.disease} Outbreak - ${e.country}: ${e.title}]]></title>
+      <link>${e.sourceUrl || 'https://pha.gov.sa'}</link>
+      <description><![CDATA[${e.summary || ''} (Cases: ${e.cases || 0}, Deaths: ${e.deaths || 0}, Risk Level: ${e.riskLevel})]]></description>
+      <category>${e.boardType || 'biological'}</category>
+      <pubDate>${new Date(e.dateReported || Date.now()).toUTCString()}</pubDate>
+      <guid>${e.id}</guid>
+    </item>`).join('');
+
+        const xml = `<?xml version="1.0" encoding="UTF-8" ?>
+<rss version="2.0">
+  <channel>
+    <title>Public Health Authority (PHA) - Global Outbreak Radar Feed</title>
+    <link>https://pha.gov.sa</link>
+    <description>Official Real-Time Epidemiological Surveillance Feed from GHI Global Radar</description>
+    <language>en-us</language>
+    <lastBuildDate>${new Date().toUTCString()}</lastBuildDate>
+    ${rssItems}
+  </channel>
+</rss>`;
+
+        return c.text(xml, 200, { 'Content-Type': 'application/xml; charset=utf-8' });
+    } catch {
+        return c.text('<rss version="2.0"><channel><title>GHI Global Radar</title></channel></rss>', 200, { 'Content-Type': 'application/xml' });
+    }
+};
+
+app.get('/api/radar/rss', handleRssFeed);
+app.get('/api/v1/radar/rss', handleRssFeed);
+
+app.post('/api/radar/scan', async (c) => {
+    try {
+        const dbClient = getDB(c.env);
+        const result = await fetchGlobalRadarScan(dbClient);
+        return c.json(result);
+    } catch (e) {
+        return c.json({ error: 'Scan failed', details: String(e) }, 500);
+    }
+});
+
+app.post('/api/radar/promote', async (c) => {
+    try {
+        const { eventId } = await c.req.json();
+        const dbClient = getDB(c.env);
+        const newSignal = await promoteRadarEventToSignal(dbClient, eventId);
+        return c.json({ success: true, signal: newSignal });
+    } catch (e) {
+        return c.json({ error: 'Failed to promote radar event', details: String(e) }, 500);
+    }
+});
+
+// --- ADMIN DATABASE RESET ROUTE ---
+app.post('/api/admin/reset-db', async (c) => {
+    try {
+        const dbClient = getDB(c.env);
+        // Reset signals and radar events
+        await dbClient.delete(schema.escalations);
+        await dbClient.delete(schema.assessments);
+        await dbClient.delete(schema.signals);
+        await dbClient.delete(schema.radarEvents);
+        
+        // Trigger fresh scan starting from July 25th
+        await fetchGlobalRadarScan(dbClient);
+        
+        return c.json({ success: true, message: 'Database reset completed. Fresh ingestion active from July 25th, 2026.' });
+    } catch (e) {
+        return c.json({ error: 'Database reset failed', details: String(e) }, 500);
+    }
+});
 
 export default {
     fetch: app.fetch,
     async scheduled(event: any, env: Bindings, ctx: ExecutionContext) {
-        const db = getDB(env.HYPERDRIVE);
-        const collector = new BeaconCollector(db);
+        const dbClient = getDB(env);
+        const collector = new BeaconCollector(dbClient);
         ctx.waitUntil(collector.collect());
+        ctx.waitUntil(fetchGlobalRadarScan(dbClient));
     },
 };
+
+

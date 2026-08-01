@@ -1,0 +1,895 @@
+{
+  "version": "2.2",
+  "updated_at": "2026-02-17T12:00:00Z",
+  "description": "Unified source configuration for SehaRadar v1.0 - Single source of truth for all data sources. All RSS feeds now monitored via ChangeDetection.io for unified pipeline. February 2026 expansion with WHO regional offices and disease-specific dashboards.",
+  "sources": [
+    {
+      "id": "WHO",
+      "name": "World Health Organization - Disease Outbreak News",
+      "type": "changedetection",
+      "watch_uuid": "4125358c-e214-432b-a534-417be9664cca",
+      "url": "https://www.who.int/emergencies/disease-outbreak-news",
+      "parser": "who_outbreak",
+      "check_interval": {
+        "hours": 1
+      },
+      "enabled": true,
+      "priority_boost": 0,
+      "tags": [
+        "health-surveillance",
+        "primary"
+      ]
+    },
+    {
+      "id": "CDC",
+      "name": "Centers for Disease Control and Prevention - Outbreaks",
+      "type": "changedetection",
+      "watch_uuid": "097d6524-4761-45ac-b4a7-ba377745a368",
+      "url": "https://www.cdc.gov/outbreaks/",
+      "parser": "cdc_outbreak",
+      "check_interval": {
+        "hours": 1,
+        "minutes": 10
+      },
+      "enabled": true,
+      "priority_boost": 0,
+      "tags": [
+        "health-surveillance",
+        "primary"
+      ]
+    },
+    {
+      "id": "PROMED",
+      "name": "ProMED-mail (Program for Monitoring Emerging Diseases)",
+      "type": "changedetection",
+      "watch_uuid": "ee064572-cd0c-4e42-b512-43b7f7300684",
+      "url": "https://www.promedmail.org/",
+      "parser": "promed",
+      "config": {
+        "resolve_links": false,
+        "only_new_titles": true,
+        "max_unlocks": 5,
+        "resolver_script": "promed.js",
+        "resolver_timeout_sec": 240,
+        "headless": true
+      },
+      "check_interval": {
+        "minutes": 5
+      },
+      "enabled": true,
+      "priority_boost": 0,
+      "tags": [
+        "health-surveillance",
+        "primary"
+      ]
+    },
+    {
+      "id": "ECDC",
+      "name": "European Centre for Disease Prevention and Control - News",
+      "type": "changedetection",
+      "watch_uuid": "826fd69f-393e-43b9-bf85-f3ea3ab2b67f",
+      "url": "https://www.ecdc.europa.eu/en/news-events",
+      "parser": "generic",
+      "check_interval": {
+        "hours": 6
+      },
+      "enabled": true,
+      "priority_boost": 0,
+      "tags": [
+        "health-surveillance",
+        "primary"
+      ]
+    },
+    {
+      "id": "ECDC_CDTR",
+      "name": "ECDC - Communicable Disease Threats Report (Weekly)",
+      "type": "changedetection",
+      "watch_uuid": "e70d9414-f1cf-494e-bfba-6f022e9488bf",
+      "url": "https://www.ecdc.europa.eu/en/publications-data/communicable-disease-threats-report-24-30-january-2026-week-5",
+      "parser": "ecdc_cdtr_pdf",
+      "check_interval": {
+        "days": 7
+      },
+      "enabled": true,
+      "priority_boost": 1,
+      "tags": [
+        "health-surveillance",
+        "weekly-report",
+        "respiratory"
+      ]
+    },
+    {
+      "id": "WHO_COVID_SITREP",
+      "name": "WHO - COVID-19 Situation Reports",
+      "type": "changedetection",
+      "watch_uuid": "ca9badf7-a92d-418e-a4d3-18a3d9b599b4",
+      "url": "https://www.who.int/emergencies/diseases/novel-coronavirus-2019/situation-reports",
+      "parser": "who_outbreak",
+      "check_interval": {
+        "days": 1
+      },
+      "enabled": true,
+      "priority_boost": 0,
+      "tags": [
+        "health-surveillance",
+        "covid-19",
+        "respiratory"
+      ]
+    },
+    {
+      "id": "WHO_COVID_DASHBOARD",
+      "name": "WHO - COVID-19 Global Data Dashboard",
+      "type": "changedetection",
+      "watch_uuid": "3e633331-8a48-4ada-80c7-92927a44f351",
+      "url": "https://data.who.int/dashboards/covid19/cases",
+      "parser": "generic",
+      "check_interval": {
+        "days": 1
+      },
+      "enabled": true,
+      "priority_boost": 0,
+      "tags": [
+        "health-surveillance",
+        "covid-19",
+        "dashboard"
+      ]
+    },
+    {
+      "id": "WHO_RESPIRATORY",
+      "name": "WHO - Global Influenza Programme Surveillance",
+      "type": "changedetection",
+      "watch_uuid": "94b2c05b-5f39-451f-bb9c-6e8a266fce48",
+      "url": "https://www.who.int/teams/global-influenza-programme/surveillance-and-monitoring/respiratory-viruses",
+      "parser": "who_outbreak",
+      "check_interval": {
+        "days": 7
+      },
+      "enabled": true,
+      "priority_boost": 0,
+      "tags": [
+        "health-surveillance",
+        "influenza",
+        "respiratory"
+      ]
+    },
+    {
+      "id": "WHO_VARIANTS",
+      "name": "WHO - SARS-CoV-2 Variants Tracking",
+      "type": "changedetection",
+      "watch_uuid": "35bd3c60-903c-4f2c-a95a-2d2d4337582f",
+      "url": "https://www.who.int/activities/tracking-SARS-CoV-2-variants",
+      "parser": "who_outbreak",
+      "check_interval": {
+        "days": 7
+      },
+      "enabled": true,
+      "priority_boost": 0,
+      "tags": [
+        "health-surveillance",
+        "covid-19",
+        "variants"
+      ]
+    },
+    {
+      "id": "WHO_EMRO_MERS",
+      "name": "WHO EMRO - MERS Outbreaks",
+      "type": "changedetection",
+      "watch_uuid": "091d2941-9115-4fa6-aa74-bb86f51c2f38",
+      "url": "https://www.emro.who.int/health-topics/mers-cov/mers-outbreaks.html",
+      "parser": "who_outbreak",
+      "check_interval": {
+        "days": 1
+      },
+      "enabled": true,
+      "priority_boost": 1,
+      "tags": [
+        "health-surveillance",
+        "mers",
+        "middle-east"
+      ]
+    },
+    {
+      "id": "CDC_COVID_SURVEILLANCE",
+      "name": "CDC - COVID-19 Surveillance",
+      "type": "changedetection",
+      "watch_uuid": "90e58e0b-7e2f-4fd5-b1e4-34ac2e5d736d",
+      "url": "https://www.cdc.gov/covid/php/surveillance/index.html",
+      "parser": "cdc_outbreak",
+      "check_interval": {
+        "days": 1
+      },
+      "enabled": true,
+      "priority_boost": 0,
+      "tags": [
+        "health-surveillance",
+        "covid-19",
+        "usa"
+      ]
+    },
+    {
+      "id": "CDC_FLUVIEW",
+      "name": "CDC - FluView (Influenza Surveillance)",
+      "type": "changedetection",
+      "watch_uuid": "052f6873-c706-4687-9a25-e6a4a6f16a9a",
+      "url": "https://www.cdc.gov/fluview/index.html",
+      "parser": "cdc_outbreak",
+      "check_interval": {
+        "days": 7
+      },
+      "enabled": true,
+      "priority_boost": 0,
+      "tags": [
+        "health-surveillance",
+        "influenza",
+        "usa"
+      ]
+    },
+    {
+      "id": "CHINA_CDC",
+      "name": "China CDC - Disease Data",
+      "type": "changedetection",
+      "watch_uuid": "b14df63f-e575-4a91-9087-4e99a1f592a3",
+      "url": "https://www.chinacdc.cn/jksj/xgbdyq/",
+      "parser": "generic",
+      "check_interval": {
+        "days": 1
+      },
+      "enabled": true,
+      "priority_boost": 0,
+      "tags": [
+        "health-surveillance",
+        "china",
+        "asia"
+      ]
+    },
+    {
+      "id": "ITALY_HEALTH",
+      "name": "Italy Ministry of Health - COVID-19 Weekly Reports",
+      "type": "changedetection",
+      "watch_uuid": "6f274bb7-3137-46d8-b6e9-5d44e6cf434c",
+      "url": "https://www.salute.gov.it/new/it/tema/covid-19/report-settimanali-covid-19/",
+      "parser": "generic",
+      "check_interval": {
+        "days": 7
+      },
+      "enabled": true,
+      "priority_boost": 0,
+      "tags": [
+        "health-surveillance",
+        "covid-19",
+        "europe"
+      ]
+    },
+    {
+      "id": "HONG_KONG_CHP",
+      "name": "Hong Kong Centre for Health Protection",
+      "type": "changedetection",
+      "watch_uuid": "cf00e9e1-795d-4510-9ee5-b3dd80aea245",
+      "url": "https://www.chp.gov.hk/en/index.html",
+      "parser": "generic",
+      "check_interval": {
+        "days": 1
+      },
+      "enabled": true,
+      "priority_boost": 0,
+      "tags": [
+        "health-surveillance",
+        "hong-kong",
+        "asia"
+      ]
+    },
+    {
+      "id": "UK_UKHSA",
+      "name": "UK Health Security Agency - Dashboard",
+      "type": "changedetection",
+      "watch_uuid": "f887a989-e735-4b1e-9d14-1f946bf10ec6",
+      "url": "https://ukhsa-dashboard.data.gov.uk/",
+      "parser": "generic",
+      "check_interval": {
+        "days": 1
+      },
+      "enabled": true,
+      "priority_boost": 0,
+      "tags": [
+        "health-surveillance",
+        "uk",
+        "dashboard"
+      ]
+    },
+    {
+      "id": "GERMANY_RKI",
+      "name": "Germany RKI - Influenza Weekly Reports",
+      "type": "changedetection",
+      "watch_uuid": "6c14c7ea-d773-4bd5-b85c-9cb7d298dddd",
+      "url": "https://influenza.rki.de/Wochenberichte.aspx",
+      "parser": "generic",
+      "check_interval": {
+        "days": 7
+      },
+      "enabled": true,
+      "priority_boost": 0,
+      "tags": [
+        "health-surveillance",
+        "influenza",
+        "germany"
+      ]
+    },
+    {
+      "id": "JAPAN_MHLW",
+      "name": "Japan Ministry of Health - Infectious Disease Data",
+      "type": "changedetection",
+      "watch_uuid": "aadd89c5-c83d-476b-a7cd-96b20ae41854",
+      "url": "https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/0000121431_00485.html",
+      "parser": "mhlw_covid_pdf",
+      "config": {
+        "max_pdfs": 12,
+        "request_timeout_sec": 45
+      },
+      "check_interval": {
+        "days": 1
+      },
+      "enabled": true,
+      "priority_boost": 0,
+      "tags": [
+        "health-surveillance",
+        "japan",
+        "asia"
+      ]
+    },
+    {
+      "id": "CANADA_HEALTH",
+      "name": "Canada Health Infobase - Respiratory Virus Surveillance",
+      "type": "changedetection",
+      "watch_uuid": "41b35ab4-a832-409b-a723-640a1b481162",
+      "url": "https://health-infobase.canada.ca/respiratory-virus-surveillance/?source=rvdss",
+      "parser": "generic",
+      "check_interval": {
+        "days": 7
+      },
+      "enabled": true,
+      "priority_boost": 0,
+      "tags": [
+        "health-surveillance",
+        "respiratory",
+        "canada"
+      ]
+    },
+    {
+      "id": "NEWS_MEDICAL_COVID",
+      "name": "News-Medical.net - COVID-19 News",
+      "type": "changedetection",
+      "watch_uuid": "2ca9e106-ef4d-450e-a389-527dd91e73ff",
+      "url": "https://www.news-medical.net/condition/Coronavirus-Disease-COVID-19",
+      "parser": "generic",
+      "check_interval": {
+        "hours": 12
+      },
+      "enabled": true,
+      "priority_boost": -1,
+      "tags": [
+        "news-aggregator",
+        "covid-19"
+      ]
+    },
+    {
+      "id": "CIDRAP",
+      "name": "CIDRAP - Center for Infectious Disease Research and Policy",
+      "type": "changedetection",
+      "watch_uuid": "18aad26e-cbdb-46e4-aee3-b7e38f8a9df0",
+      "url": "https://www.cidrap.umn.edu/",
+      "parser": "generic",
+      "check_interval": {
+        "hours": 6
+      },
+      "enabled": true,
+      "priority_boost": 0,
+      "tags": [
+        "health-surveillance",
+        "research"
+      ]
+    },
+    {
+      "id": "WHO_CLONE",
+      "name": "WHO Clone (Test Site)",
+      "type": "changedetection",
+      "watch_uuid": "e8e67f93-1741-4ea6-b61a-b514855b6b5c",
+      "url": "https://who.fayaa92.sa/",
+      "parser": "who_outbreak",
+      "check_interval": {
+        "hours": 1
+      },
+      "enabled": false,
+      "priority_boost": 0,
+      "tags": []
+    },
+    {
+      "id": "GOOGLE",
+      "name": "Google Custom Search",
+      "type": "google_search",
+      "config": {
+        "diseases": [
+          "Mpox",
+          "Marburg",
+          "MERS",
+          "Cholera",
+          "Measles",
+          "H5N1",
+          "Dengue",
+          "Ebola",
+          "COVID-19",
+          "Polio"
+        ],
+        "languages": [
+          "en",
+          "ar"
+        ],
+        "regions": [
+          "global",
+          "middle_east",
+          "africa",
+          "asia",
+          "americas"
+        ],
+        "max_results": 10,
+        "lookback_days": 7
+      },
+      "check_interval": {
+        "hours": 24
+      },
+      "enabled": true,
+      "priority_boost": 0,
+      "tags": []
+    },
+    {
+      "id": "WHO_SITREP",
+      "name": "WHO - Global Situation Reports",
+      "type": "changedetection",
+      "watch_uuid": "1592c196-ccdd-4077-94d7-8143fb5ea8c6",
+      "url": "https://www.who.int/emergencies/situation-reports",
+      "parser": "who_outbreak",
+      "check_interval": {
+        "hours": 12
+      },
+      "enabled": true,
+      "priority_boost": 0,
+      "tags": [
+        "health-surveillance",
+        "primary",
+        "situation-reports"
+      ]
+    },
+    {
+      "id": "WHO_AFRO",
+      "name": "WHO AFRO - Africa Disease Outbreaks",
+      "type": "changedetection",
+      "watch_uuid": "41ffe418-eb34-4e93-8fb8-bea7da1d71d2",
+      "url": "https://www.afro.who.int/health-topics/disease-outbreaks",
+      "parser": "who_afro_document",
+      "config": {
+        "max_pdfs": 3,
+        "request_timeout_sec": 45,
+        "extract_pages": 2,
+        "extract_max_chars": 5000
+      },
+      "check_interval": {
+        "hours": 6
+      },
+      "enabled": true,
+      "priority_boost": 1,
+      "tags": [
+        "health-surveillance",
+        "who-regional",
+        "africa"
+      ]
+    },
+    {
+      "id": "WHO_EMRO_OUTBREAKS",
+      "name": "WHO EMRO - Eastern Mediterranean Outbreaks",
+      "type": "changedetection",
+      "watch_uuid": "f78398f2-7816-45f9-8a74-86e581589891",
+      "url": "https://www.emro.who.int/health-topics/disease-outbreaks/index.html",
+      "parser": "who_outbreak",
+      "check_interval": {
+        "hours": 6
+      },
+      "enabled": false,
+      "priority_boost": 2,
+      "tags": [
+        "health-surveillance",
+        "who-regional",
+        "middle-east"
+      ]
+    },
+    {
+      "id": "WHO_EURO",
+      "name": "WHO EURO - Europe Emergencies",
+      "type": "changedetection",
+      "watch_uuid": "3781841b-d870-4953-97ee-2f4f79bbfbcd",
+      "url": "https://www.who.int/europe/emergencies",
+      "parser": "who_outbreak",
+      "check_interval": {
+        "hours": 6
+      },
+      "enabled": true,
+      "priority_boost": 0,
+      "tags": [
+        "health-surveillance",
+        "who-regional",
+        "europe"
+      ]
+    },
+    {
+      "id": "WHO_SEARO",
+      "name": "WHO SEARO - Southeast Asia Emergencies",
+      "type": "changedetection",
+      "watch_uuid": "6e25eafe-dcb2-4e7b-b2f8-e3adf3110532",
+      "url": "https://www.who.int/southeastasia/emergencies",
+      "parser": "who_outbreak",
+      "check_interval": {
+        "hours": 6
+      },
+      "enabled": true,
+      "priority_boost": 0,
+      "tags": [
+        "health-surveillance",
+        "who-regional",
+        "asia"
+      ]
+    },
+    {
+      "id": "WHO_WPRO",
+      "name": "WHO WPRO - Western Pacific Emergencies",
+      "type": "changedetection",
+      "watch_uuid": "847dbb48-ab35-4fc4-9ba9-9bd3183292a1",
+      "url": "https://www.who.int/westernpacific/emergencies",
+      "parser": "who_outbreak",
+      "check_interval": {
+        "hours": 6
+      },
+      "enabled": true,
+      "priority_boost": 0,
+      "tags": [
+        "health-surveillance",
+        "who-regional",
+        "asia"
+      ]
+    },
+    {
+      "id": "PAHO",
+      "name": "PAHO - Pan American Health Organization Outbreaks",
+      "type": "changedetection",
+      "watch_uuid": "1d352e3f-a2a3-475d-954f-707b5c207584",
+      "url": "https://www.paho.org/en/outbreaks",
+      "parser": "generic",
+      "check_interval": {
+        "hours": 6
+      },
+      "enabled": true,
+      "priority_boost": 0,
+      "tags": [
+        "health-surveillance",
+        "who-regional",
+        "americas"
+      ]
+    },
+    {
+      "id": "ECDC_OUTBREAKS",
+      "name": "ECDC - Threats and Outbreaks",
+      "type": "changedetection",
+      "watch_uuid": "0cbb9867-7ba5-4312-ba9e-0b4f02cb06a7",
+      "url": "https://www.ecdc.europa.eu/en/threats-and-outbreaks",
+      "parser": "ecdc_cdtr_pdf",
+      "check_interval": {
+        "hours": 6
+      },
+      "enabled": true,
+      "priority_boost": 1,
+      "tags": [
+        "health-surveillance",
+        "primary",
+        "europe"
+      ]
+    },
+    {
+      "id": "UK_HPR",
+      "name": "UK Gov - Health Protection Reports",
+      "type": "changedetection",
+      "watch_uuid": "aeb8d8ba-afae-4cf1-aa9c-82d803cc366b",
+      "url": "https://www.gov.uk/government/collections/health-protection-reports",
+      "parser": "generic",
+      "check_interval": {
+        "days": 1
+      },
+      "enabled": true,
+      "priority_boost": 0,
+      "tags": [
+        "health-surveillance",
+        "weekly-report",
+        "uk"
+      ]
+    },
+    {
+      "id": "CDC_TRAVEL",
+      "name": "CDC - Travel Health Notices",
+      "type": "changedetection",
+      "watch_uuid": "c5fd63fb-e366-4ae0-bc52-8916ff3582d3",
+      "url": "https://wwwnc.cdc.gov/travel/notices",
+      "parser": "cdc_outbreak",
+      "check_interval": {
+        "hours": 6
+      },
+      "enabled": true,
+      "priority_boost": 1,
+      "tags": [
+        "health-surveillance",
+        "travel-advisory",
+        "usa"
+      ]
+    },
+    {
+      "id": "GPEI_POLIO",
+      "name": "GPEI - Polio This Week",
+      "type": "changedetection",
+      "watch_uuid": "2407f884-dad4-4151-a94c-443c39f03b4e",
+      "url": "https://polioeradication.org/about-polio/polio-this-week/",
+      "parser": "generic",
+      "check_interval": {
+        "days": 1
+      },
+      "enabled": true,
+      "priority_boost": 0,
+      "tags": [
+        "health-surveillance",
+        "disease-specific",
+        "polio"
+      ]
+    },
+    {
+      "id": "WHO_MPX",
+      "name": "WHO - Mpox Global Dashboard",
+      "type": "changedetection",
+      "watch_uuid": "ea4c8cbf-3c43-436e-9487-fa5f1cea0f15",
+      "url": "https://worldhealthorg.shinyapps.io/mpx_global/#2_Global_situation_update",
+      "parser": "generic",
+      "check_interval": {
+        "days": 1
+      },
+      "enabled": true,
+      "priority_boost": 1,
+      "tags": [
+        "health-surveillance",
+        "disease-specific",
+        "mpox",
+        "dashboard"
+      ]
+    },
+    {
+      "id": "WHO_MPX_API",
+      "name": "WHO - Mpox API Daily Validated",
+      "type": "changedetection",
+      "watch_uuid": "24f80028-1b46-41ed-90a1-7d5b506f47c2",
+      "url": "https://xmart-api-public.who.int/MPX/V_MPX_VALIDATED_DAILY",
+      "parser": "who_mpox",
+      "check_interval": {
+        "days": 1
+      },
+      "enabled": true,
+      "priority_boost": 1,
+      "tags": [
+        "health-surveillance",
+        "disease-specific",
+        "mpox",
+        "dashboard",
+        "api"
+      ]
+    },
+    {
+      "id": "GTFCC_CHOLERA",
+      "name": "GTFCC - Global Cholera Trends",
+      "type": "changedetection",
+      "watch_uuid": "e54512bd-5a9b-4a6f-8626-5a188db1c44c",
+      "url": "https://www.gtfcc.org/about-cholera/cholera-trends/",
+      "parser": "gtfcc_cholera",
+      "check_interval": {
+        "days": 1
+      },
+      "enabled": true,
+      "priority_boost": 1,
+      "tags": [
+        "health-surveillance",
+        "disease-specific",
+        "cholera"
+      ]
+    },
+
+    {
+      "id": "WHO_FEATURES_RSSHUB",
+      "name": "WHO Feature Stories via RSSHub",
+      "type": "rsshub",
+      "rsshub_route": "who/news-room/feature-stories",
+      "rsshub_config": {
+        "limit": 20
+      },
+      "url": "https://www.who.int/news-room/feature-stories",
+      "parser": "rsshub",
+      "check_interval": {
+        "hours": 3
+      },
+      "enabled": true,
+      "priority_boost": 1,
+      "tags": [
+        "health-surveillance",
+        "primary",
+        "rsshub"
+      ]
+    },
+    {
+      "id": "WHO_COMMENTARIES_RSSHUB",
+      "name": "WHO Commentaries via RSSHub",
+      "type": "rsshub",
+      "rsshub_route": "who/news-room/commentaries",
+      "rsshub_config": {
+        "limit": 15
+      },
+      "url": "https://www.who.int/news-room/commentaries",
+      "parser": "rsshub",
+      "check_interval": {
+        "hours": 6
+      },
+      "enabled": true,
+      "priority_boost": 1,
+      "tags": [
+        "health-surveillance",
+        "primary",
+        "rsshub"
+      ]
+    },
+    {
+      "id": "CHINA_CDC_INFECTIOUS_RSSHUB",
+      "name": "China CDC - Infectious Diseases via RSSHub",
+      "type": "rsshub",
+      "rsshub_route": "chinacdc/jkyj/crb2",
+      "rsshub_config": {
+        "limit": 15
+      },
+      "url": "https://www.chinacdc.cn/jkyj/crb2/",
+      "parser": "rsshub",
+      "check_interval": {
+        "days": 1
+      },
+      "enabled": true,
+      "priority_boost": 0,
+      "tags": [
+        "health-surveillance",
+        "china",
+        "rsshub"
+      ]
+    },
+    {
+      "id": "CHINA_CDC_EMERGENCIES_RSSHUB",
+      "name": "China CDC - Public Health Emergencies via RSSHub",
+      "type": "rsshub",
+      "rsshub_route": "chinacdc/jkyj/tfggws",
+      "rsshub_config": {
+        "limit": 15
+      },
+      "url": "https://www.chinacdc.cn/jkyj/tfggws/",
+      "parser": "rsshub",
+      "check_interval": {
+        "days": 1
+      },
+      "enabled": true,
+      "priority_boost": 1,
+      "tags": [
+        "health-surveillance",
+        "china",
+        "rsshub",
+        "emergencies"
+      ]
+    },
+    {
+      "id": "CHINA_CDC_NEWS_RSSHUB",
+      "name": "China CDC - Center News via RSSHub",
+      "type": "rsshub",
+      "rsshub_route": "chinacdc/zxyw",
+      "rsshub_config": {
+        "limit": 15
+      },
+      "url": "https://www.chinacdc.cn/zxyw/",
+      "parser": "rsshub",
+      "check_interval": {
+        "days": 1
+      },
+      "enabled": true,
+      "priority_boost": 0,
+      "tags": [
+        "health-surveillance",
+        "china",
+        "rsshub"
+      ]
+    }
+  ],
+  "tags": {
+    "health-surveillance": "37342b3f-4f96-4a74-a166-3de7e070b885",
+    "primary": "Primary outbreak sources",
+    "weekly-report": "Weekly surveillance reports",
+    "situation-reports": "Global situation reports",
+    "who-regional": "WHO Regional Office sources",
+    "respiratory": "Respiratory disease surveillance",
+    "covid-19": "COVID-19 specific",
+    "influenza": "Influenza surveillance",
+    "variants": "Variant tracking",
+    "mers": "MERS-CoV surveillance",
+    "mpox": "Mpox/Monkeypox surveillance",
+    "cholera": "Cholera surveillance",
+    "polio": "Polio eradication tracking",
+    "disease-specific": "Disease-specific dashboards",
+    "middle-east": "Middle East region",
+    "africa": "Africa region",
+    "americas": "Americas region",
+    "humanitarian": "Humanitarian/disaster response",
+    "disasters": "Global disaster monitoring",
+    "travel-advisory": "Travel health advisories",
+    "news-aggregator": "News aggregator sources",
+    "medical-news": "Medical news outlets",
+    "research": "Research institutions",
+    "dashboard": "Data dashboards",
+    "rss-feed": "RSS feeds monitored via ChangeDetection",
+    "rsshub": "RSS feeds delivered via self-hosted RSSHub instance",
+    "google-news": "Google News RSS feeds",
+    "usa": "United States",
+    "europe": "Europe",
+    "asia": "Asia-Pacific",
+    "australia": "Australia",
+    "china": "China",
+    "hong-kong": "Hong Kong",
+    "uk": "United Kingdom",
+    "germany": "Germany",
+    "japan": "Japan",
+    "canada": "Canada"
+  },
+  "parsers": {
+    "who_outbreak": "WHO Disease Outbreak News format",
+    "cdc_outbreak": "CDC Outbreaks page format",
+    "generic": "Generic HTML extraction with AI",
+    "mhlw_covid_pdf": "MHLW COVID-19 PDF table totals (\u7dcf\u6570) parser",
+    "who_afro_document": "WHO AFRO PDF document parser",
+    "ecdc_cdtr_pdf": "ECDC CDTR PDF executive summary parser"
+  },
+  "metadata": {
+    "total_sources": 42,
+    "active_sources": 40,
+    "inactive_sources": 2,
+    "source_types": {
+      "changedetection": 36,
+      "rsshub": 5,
+      "rss": 0,
+      "google_search": 1
+    },
+    "regions_covered": [
+      "global",
+      "usa",
+      "europe",
+      "asia",
+      "middle_east",
+      "africa",
+      "americas",
+      "australia",
+      "canada"
+    ],
+    "diseases_covered": [
+      "COVID-19",
+      "Influenza",
+      "MERS",
+      "Mpox",
+      "Marburg",
+      "Cholera",
+      "Measles",
+      "H5N1",
+      "Dengue",
+      "Ebola",
+      "Polio"
+    ],
+    "notes": "February 2026 expansion: Added WHO regional offices (AFRO, EMRO, EURO, SEARO, WPRO), PAHO, ECDC Outbreaks, CDC Travel, GPEI Polio, WHO Mpox Dashboard, and GTFCC Cholera. Added 5 RSSHub sources: WHO News EN/AR, China CDC Infectious Diseases, Public Health Emergencies, and Center News. Removed 9 stale ChangeDetection watchers that no longer existed upstream. All sources run through the unified ChangeDetection.io + RSSHub pipeline. Last updated: 2026-03-04"
+  }
+}

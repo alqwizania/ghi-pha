@@ -1,0 +1,136 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "seharadar-cloudflare",
+  "main": "cloudflare/src/index.ts",
+  "compatibility_date": "2026-05-26",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "assets": {
+    "directory": "cloudflare/public",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*", "/status", "/globe", "/globe/", "/map/outbreaks", "/map/outbreaks/"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "seharadar-prod",
+      "database_id": "67bd8704-f966-4340-876b-d2c80d614b5b",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "ARTIFACTS",
+      "bucket_name": "seharadar-artifacts"
+    }
+  ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "SOURCE_SCAN_QUEUE",
+        "queue": "source-scan-jobs"
+      },
+      {
+        "binding": "FINDING_PROCESS_QUEUE",
+        "queue": "finding-process-jobs"
+      },
+      {
+        "binding": "DEAD_LETTER_QUEUE",
+        "queue": "dead-letter-jobs"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "source-scan-jobs"
+      },
+      {
+        "queue": "finding-process-jobs"
+      },
+      {
+        "queue": "dead-letter-jobs"
+      }
+    ]
+  },
+  "browser": {
+    "binding": "BROWSER",
+    "remote": true
+  },
+  "triggers": {
+    "crons": ["*/15 * * * *"]
+  },
+  "workflows": [
+    {
+      "binding": "PROCESS_SOURCE_WORKFLOW",
+      "name": "process-source-workflow",
+      "class_name": "ProcessSourceWorkflow"
+    }
+  ],
+  "vars": {
+    "ENVIRONMENT": "production",
+    "PUBLIC_CACHE_SECONDS": "300",
+    "OPENROUTER_BASE_URL": "https://openrouter.ai/api/v1",
+    "OPENROUTER_MODEL": "openai/gpt-4o-mini"
+  },
+  "env": {
+    "staging": {
+      "name": "seharadar-cloudflare-staging",
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "seharadar-staging",
+          "database_id": "11111111-1111-1111-1111-111111111111",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "r2_buckets": [
+        {
+          "binding": "ARTIFACTS",
+          "bucket_name": "seharadar-artifacts-staging"
+        }
+      ],
+      "queues": {
+        "producers": [
+          {
+            "binding": "SOURCE_SCAN_QUEUE",
+            "queue": "source-scan-jobs-staging"
+          },
+          {
+            "binding": "FINDING_PROCESS_QUEUE",
+            "queue": "finding-process-jobs-staging"
+          },
+          {
+            "binding": "DEAD_LETTER_QUEUE",
+            "queue": "dead-letter-jobs-staging"
+          }
+        ],
+        "consumers": [
+          {
+            "queue": "source-scan-jobs-staging"
+          },
+          {
+            "queue": "finding-process-jobs-staging"
+          },
+          {
+            "queue": "dead-letter-jobs-staging"
+          }
+        ]
+      },
+      "workflows": [
+        {
+          "binding": "PROCESS_SOURCE_WORKFLOW",
+          "name": "process-source-workflow-staging",
+          "class_name": "ProcessSourceWorkflow"
+        }
+      ],
+      "vars": {
+        "ENVIRONMENT": "staging",
+        "PUBLIC_CACHE_SECONDS": "60",
+        "OPENROUTER_BASE_URL": "https://openrouter.ai/api/v1",
+        "OPENROUTER_MODEL": "openai/gpt-4o-mini"
+      }
+    }
+  }
+}

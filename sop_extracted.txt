@@ -1,0 +1,197 @@
+
+  Purpose: These Standard operating procedures are set to guide the workflow and process of Global event-based surveillance to allow for early detection and response.
+
+Apply to: Syndromic Surveillance departments, Executive Department of Surveillance
+
+Definitions:
+Epidemic Intelligence
+EI
+Epidemic Intelligence from Open Sources (EIOS), Portal developed by WHO
+EIOS
+Refers to countries neighboring the kingdom of Saudi Arabia and/or sharing borders; includes: GCC, Yemen, Iraq, Syria, Jordan, Palestine, Lebanon, Egypt and Sudan.
+Regional
+Syndromic Surveillance
+SS
+Related documents:
+
+Related forms/Process (If applied)
+
+Procedures:
+Serial
+Procedure
+Responsible
+1
+PHI Epidemic intelligence activities are handled by Syndromic Surveillance Department.  EI Service is supported by the following stakeholders:
+Health Informatics Department
+Global Health Department
+Emergency and preparedness Department
+
+
+2
+Signal Detection
+
+Media scanning is an active process performed by the assigned EIOS’s team daily, during workweek (between 09:00 to 10:00 AM) to detect the signals.
+Utilizing EIOS, two boards are be created.
+A Board for Chemical, Radiation and Nuclear Events
+A Board for Biological Events
+Search is conducted using agreed upon keywords (Appendix 1)
+Signals that are captured from media should be recorded in the EIOS Template (Appendix 2)
+Other tools to be utilized include:
+Beacon
+HealthMap
+ProMed
+GPHIN
+Signals That are captured from these sources should be recorded in the “Other Signals” Template” (Appendix 3)
+SS
+3
+Signal filtration
+
+Signals that are captured shall be filtered by removing duplicates and information that is not relevant 
+Signals shall be reported to EI unit for Triaging.
+SS Specialist
+
+4
+Signal Triaging
+Triaging round will be conducted by PHI EIOS team daily.
+Picked up signals shall meet one of the following criteria
+Unknown illness 
+Unusual event (antimicrobial resistance, detection of new features of a disease, atypical signs, and symptoms, significantly high number of cases over a short period in a limited geographic area, newly imported disease, occurrence in an area outside the endemic areas in the country)
+The risk to the health system (affects a significant proportion of health workers, Case fatality rate (CFR) of the disease is significantly higher than expected, the occurrence of disease outside the normal seasonal pattern, re-emergence of communicable diseases, affects a conflict area)
+International disease spread
+Interference with travel or trade
+Disease for elimination or eradication 
+Zoonotic diseases
+Suspected, accidental or deliberate biological or chemical threats
+Sensational report or high media attention expected
+SS Specialist
+5
+Second Signal Triaging
+
+
+A second triaging process to identify signals of interests.
+Signals triaged at this stage are to be included in the weekly report for stakeholders to review.
+Signals inclusion criteria are:
+Emerging; new pathogen or strain
+Diseases with High CFR; e.g., Haemorrhagic fevers
+Diseases with high publicity (Frequently mentioned)
+Events in neighbouring countries
+Chemical hazards and products that potentially be imported
+Important Respiratory diseases Monitoring
+
+
+SS Health Expert
+6
+Signal Verification 
+
+Communicate with the relevant sector for signal verification.
+follow-up on signals sent for verification until verification is obtained. Signals should be verified within 24 hours of detection.
+SS Specialist
+7
+Escalation
+
+
+
+
+
+
+
+Review if any of the verified signals meet the escalation criteria set by Preparedness and response department (Appendix 4).
+Report any signal that requires escalation to Director, Syndromic Surveillance
+SS Health Expert
+8
+Reports and record keeping
+
+
+
+
+
+
+
+
+Weekly report of triaged signals shall be incorporated in PHI weekly report and shared through Tabadul Platform for stakeholders.
+All Signals captured are kept in the PHI shared folder under Syndromic Surveillance EIOS
+SS Health Expert
+
+Monitoring measures:
+Monthly number of Signals that were not captured benchmarked with other agencies including Gulf Center for Diseases Prevention and Control.
+Number of articles screened
+Percentage of Signals that were captured that meet the triaging criteria.
+Percentage of Signals Verified within 24 hours.
+Percentage of Signals that were escalated. 
+
+Related forms (If apply):
+Update history
+update
+Date
+
+
+Signatory
+
+Written by
+Name
+Position
+Signature 
+Date
+Revised by
+Name
+
+Signature 
+Date
+Recommended by
+Name
+Chairman of P&P Committee
+Signature 
+Date
+Approved by
+Name
+Sector leader
+Signature 
+Date
+
+
+
+
+
+
+
+
+
+Appendix 1 — EIOS Daily Article Screening Strategy
+Section
+Procedure (Daily Screening)
+A. Purpose
+Standardize daily EIOS screening for Infectious Disease Surveillance and Environmental Threats Surveillance using consistent boards, filters, categories, and agreed keywords (aligned with epi-week).
+1. Access & boards
+Open EIOS at: https://eios.who.int/portal/monitoring/boards 
+Select a board; Use two boards: 1) Infectious Disease Surveillance; 2) Environmental Threats Surveillance.
+
+2. Basic filters
+Apply baseline filters within the selected board: 
+Time (previous day or 3 days).
+Language (English and/or Arabic) if needed.
+Geographical area (When monitoring targeted event is required)
+
+2.1 Time (epi-week aligned)
+Epi-week runs Sunday 00:00 to Saturday 23:59. 
+Daily screening uses previous day only: 00:01–23:59 of the previous calendar day. 
+Sunday screening covers Thursday 00:01 through Saturday 23:59. 
+When needed and approved, a process for extra hours may be required. This ensures continuous epi-week coverage without overlap or gaps. 
+2.2 Language
+Select publication language(s): English and/or Arabic (as applicable).
+3. Infectious Disease board
+3.1 Category: Categories → Human Health → Human Infectious Disease. 
+
+3.2 Browse stream without Text Search keywords. 
+3.3 Text Search (one keyword per search): Outbreak; Cluster; Epidemic; outbreak; Unusual; Sudden increase; Spike in cases; Mysterious; Mystery/Unknown disease; Mass/Unusual deaths; Hospital overload; Overwhelmed hospitals; Quarantine/Lockdown; surge; Critical; Hospitalized/Admission surge; Death toll/Fatalities rising. 
+3.4 Disease-specific searches (as needed): Meningococcal meningitis (Neisseria meningitidis); Meningitis (other); COVID-19; Influenza; MERS; Mpox; Dengue; Viral hemorrhagic fevers (e.g., Ebola); Yellow fever; Marburg; AFP/suspected poliomyelitis; Cholera; Foodborne outbreak; Malaria; Measles.
+4. Environmental Threats board
+4.1 Select Environmental Threats Surveillance board and apply Time + Language filters. 
+4.2 Category: Categories → Human Health → Social and environmental factors → environmental or toxic exposures
+
+4.3 Category: Categories → CBRN and HAZMAT → CBRN, chemical hazard/event, radio nuclear hazards/event and unknown substances
+4.4 Category: Categories → chemicals → all chemicals; unknown substance
+
+4.5 Category: Categories → environment → natural disasters and pollution
+
+4.6 Browse without Text Search keywords.
+4.7 Text Search (one keyword per search): Poisoning; Emergency; risk; disaster; Chemical; Radiation; Nuclear.

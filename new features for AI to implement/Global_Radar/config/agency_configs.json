@@ -1,0 +1,91 @@
+{
+  "periodic_sources": [
+    {
+      "name": "WHO",
+      "url": "https://www.who.int/emergencies/disease-outbreak-news",
+      "watch_uuid": "4125358c-e214-432b-a534-417be9664cca",
+      "type": "changedetection",
+      "enabled": true
+    },
+    {
+      "name": "CDC",
+      "url": "https://www.cdc.gov/outbreaks/",
+      "watch_uuid": "097d6524-4761-45ac-b4a7-ba377745a368",
+      "type": "changedetection",
+      "enabled": true
+    },
+    {
+      "name": "PROMED",
+      "url": "https://promedmail.org/",
+      "watch_uuid": "ee064572-cd0c-4e42-b512-43b7f7300684",
+      "type": "changedetection",
+      "description": "ProMED - Program for Monitoring Emerging Diseases",
+      "enabled": true
+    },
+    {
+      "name": "WHO_CLONE",
+      "url": "https://who.fayaa92.sa/",
+      "watch_uuid": "e8e67f93-1741-4ea6-b61a-b514855b6b5c",
+      "type": "changedetection",
+      "description": "WHO Clone test site for workflow testing",
+      "enabled": true
+    }
+  ],
+  "rss_sources": [
+    {
+      "name": "WHO_RSS",
+      "url": "https://www.who.int/rss-feeds/news-english.xml",
+      "category": "health_news",
+      "enabled": true,
+      "check_interval_hours": 6
+    },
+    {
+      "name": "CDC_RSS",
+      "url": "https://tools.cdc.gov/podcasts/feed.asp?feedid=183",
+      "category": "outbreak_updates",
+      "enabled": true,
+      "check_interval_hours": 6
+    }
+  ],
+  "google_search_config": {
+    "enabled": true,
+    "diseases": ["Mpox", "Marburg", "MERS", "Cholera", "Measles", "H5N1", "Dengue", "Ebola"],
+    "languages": ["en", "ar"],
+    "regions": ["global", "middle_east", "africa", "asia"],
+    "max_results_per_query": 10,
+    "lookback_days": 7,
+    "search_interval_hours": 24
+  },
+  "keywords_critical": [
+    "outbreak",
+    "epidemic",
+    "pandemic",
+    "Marburg",
+    "Mpox",
+    "MERS",
+    "emergency",
+    "deaths",
+    "fatalities",
+    "WHO declares",
+    "public health emergency",
+    "PHEIC"
+  ],
+  "keywords_watch": [
+    "surveillance alert",
+    "monitoring",
+    "cases reported",
+    "investigation ongoing",
+    "travel advisory",
+    "risk assessment",
+    "vaccination campaign",
+    "containment measures"
+  ],
+  "source_mapping": {
+    "WHO": "World Health Organization",
+    "CDC": "Centers for Disease Control and Prevention",
+    "PROMED": "Program for Monitoring Emerging Diseases",
+    "WHO_RSS": "WHO News RSS",
+    "CDC_RSS": "CDC Outbreak RSS",
+    "GOOGLE": "Google Search"
+  }
+}

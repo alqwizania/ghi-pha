@@ -15,10 +15,10 @@ const UserManagement = () => {
         role: 'Analyst',
         permissions: {
             dashboard: 'view',
+            radar: 'view',
             listener: 'view',
             triage: 'view',
-            assessment: 'view',
-            escalation: 'view'
+            assessment: 'view'
         }
     });
 
@@ -49,10 +49,10 @@ const UserManagement = () => {
                 role: 'Analyst',
                 permissions: {
                     dashboard: 'view',
+                    radar: 'view',
                     listener: 'view',
                     triage: 'view',
-                    assessment: 'view',
-                    escalation: 'view'
+                    assessment: 'view'
                 }
             });
         } catch (err) {

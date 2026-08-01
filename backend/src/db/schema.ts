@@ -5,6 +5,9 @@ export const signals = pgTable("signals", {
     id: uuid("id").primaryKey().defaultRandom(),
     beaconEventId: varchar("beacon_event_id", { length: 255 }).unique(),
     sourceUrl: text("source_url").notNull(),
+    sourceOrigin: varchar("source_origin", { length: 50 }).default("listener"), // listener vs radar
+    sourceName: varchar("source_name", { length: 255 }),
+    boardType: varchar("board_type", { length: 50 }).default("biological"), // biological vs environmental_cbrn
     rawData: jsonb("raw_data").notNull(),
     disease: varchar("disease", { length: 255 }).notNull(),
     country: varchar("country", { length: 100 }).notNull(),
@@ -25,6 +28,9 @@ export const signals = pgTable("signals", {
     gccRelevant: boolean("gcc_relevant").default(false),
     saudiRiskLevel: varchar("saudi_risk_level", { length: 20 }),
     currentStatus: varchar("current_status", { length: 50 }).default("New"),
+    verificationStatus: varchar("verification_status", { length: 50 }).default("Unverified"), // Unverified, Pending Verification, Verified
+    verifiedAt: timestamp("verified_at", { withTimezone: true }),
+    verificationDeadline: timestamp("verification_deadline", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
     lastBeaconSync: timestamp("last_beacon_sync", { withTimezone: true }),
@@ -82,6 +88,42 @@ export const escalations = pgTable("escalations", {
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
+export const surveillanceSources = pgTable("surveillance_sources", {
+    id: varchar("id", { length: 100 }).primaryKey(),
+    name: varchar("name", { length: 255 }).notNull(),
+    type: varchar("type", { length: 50 }).notNull(), // beacon, who, cdc, promed, ecdc, rss, api
+    url: text("url").notNull(),
+    category: varchar("category", { length: 50 }).default("biological"), // biological vs environmental_cbrn
+    enabled: boolean("enabled").default(true),
+    lastFetchedAt: timestamp("last_fetched_at", { withTimezone: true }),
+    status: varchar("status", { length: 50 }).default("active"),
+    fetchIntervalHours: integer("fetch_interval_hours").default(2),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+
+export const radarEvents = pgTable("radar_events", {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sourceId: varchar("source_id", { length: 100 }).references(() => surveillanceSources.id),
+    sourceName: varchar("source_name", { length: 255 }).notNull(),
+    title: text("title").notNull(),
+    disease: varchar("disease", { length: 255 }).notNull(),
+    country: varchar("country", { length: 100 }).notNull(),
+    lat: numeric("lat", { precision: 9, scale: 6 }),
+    lng: numeric("lng", { precision: 9, scale: 6 }),
+    dateReported: date("date_reported").notNull(),
+    cases: integer("cases").default(0),
+    deaths: integer("deaths").default(0),
+    cfr: numeric("cfr", { precision: 5, scale: 2 }),
+    summary: text("summary"),
+    sourceUrl: text("source_url").notNull(),
+    boardType: varchar("board_type", { length: 50 }).default("biological"),
+    riskLevel: varchar("risk_level", { length: 20 }).default("Moderate"),
+    isPromoted: boolean("is_promoted").default(false),
+    promotedSignalId: uuid("promoted_signal_id").references(() => signals.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
 export const users = pgTable("users", {
     id: uuid("id").primaryKey().defaultRandom(),
     username: varchar("username", { length: 100 }).unique().notNull(),
@@ -91,17 +133,16 @@ export const users = pgTable("users", {
     passwordHash: text("password_hash").notNull(),
     permissions: jsonb("permissions").default({
         dashboard: 'view',
+        radar: 'view',
         listener: 'view',
         triage: 'view',
         assessment: 'view',
-        escalation: 'view'
     }),
     lastLogin: timestamp("last_login", { withTimezone: true }),
     isActive: boolean("is_active").default(true),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
-
 
 // Social Listening Tables
 export const socialSignals = pgTable("social_signals", {
@@ -184,3 +225,4 @@ export const socialSignalRelations = relations(socialSignals, ({ one }) => ({
     relatedSignal: one(signals, { fields: [socialSignals.relatedSignalId], references: [signals.id] }),
     promotedBy: one(users, { fields: [socialSignals.promotedBy], references: [users.id] }),
 }));
+

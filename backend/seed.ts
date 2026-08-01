@@ -13,7 +13,7 @@ if (!connectionString) {
 }
 
 async function seed() {
-    const client = postgres(connectionString);
+    const client = postgres(connectionString!);
     const db = drizzle(client, { schema });
 
     console.log("Seeding admin user...");

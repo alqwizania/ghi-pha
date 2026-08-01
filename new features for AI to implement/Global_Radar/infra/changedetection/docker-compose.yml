@@ -1,0 +1,118 @@
+services:
+  changedetection:
+    image: ghcr.io/dgtlmoon/changedetection.io:latest
+    container_name: changedetection
+    hostname: changedetection
+    restart: unless-stopped
+    
+    # Use .env file for all configuration (FayaaLink standard)
+    env_file:
+      - .env
+    
+    volumes:
+      # Persistent data storage
+      - /srv/data/changedetection:/datastore
+    
+    networks:
+      - caddy_default
+    
+    # Depends on browser for Playwright support
+    depends_on:
+      - playwright-chrome
+    
+    # Health check (using Python since curl not available in container)
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  changedetection-mcp:
+    image: python:3.11-alpine
+    container_name: changedetection-mcp
+    restart: unless-stopped
+    stdin_open: true
+    working_dir: /app
+
+    # Reuse changedetection environment values (API key + URL overrides)
+    env_file:
+      - .env
+
+    command: sh -c "pip install --quiet uv && uv pip install --system 'mcp[cli]' httpx && uv run --no-project python /app/server.py"
+
+    volumes:
+      - ./mcp:/app:ro
+
+    depends_on:
+      - changedetection
+
+    networks:
+      - caddy_default
+  
+  # Playwright Chrome browser for browser-steps support (direct connection)
+  playwright-chrome:
+    image: dgtlmoon/sockpuppetbrowser:latest
+    container_name: playwright-chrome
+    hostname: playwright-chrome
+    restart: unless-stopped
+    
+    environment:
+      # Screen resolution
+      - SCREEN_WIDTH=1920
+      - SCREEN_HEIGHT=1080
+      - SCREEN_DEPTH=24
+      
+      # Max concurrent browser contexts
+      # Reduced from 10 to 5 to prevent timeout issues with multiple rechecks
+      # See: https://github.com/dgtlmoon/changedetection.io/discussions/2821
+      - MAX_CONCURRENT_CHROME_PROCESSES=5
+    
+    volumes:
+      # Shared memory for Chrome stability
+      - /dev/shm:/dev/shm
+    
+    networks:
+      - caddy_default
+    
+    # Health check for Playwright service (using stats endpoint on port 8080)
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/stats', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Playwright Chrome with Bright Data proxy (for anti-bot sites like Reuters)
+  # Registers as an Extra Browser in ChangeDetection settings
+  # Gives full Execute JS + Browser Steps support WITH proxy rotation
+  playwright-chrome-proxy:
+    image: dgtlmoon/sockpuppetbrowser:latest
+    container_name: playwright-chrome-proxy
+    hostname: playwright-chrome-proxy
+    restart: unless-stopped
+    
+    environment:
+      - SCREEN_WIDTH=1920
+      - SCREEN_HEIGHT=1080
+      - SCREEN_DEPTH=24
+      - MAX_CONCURRENT_CHROME_PROCESSES=3
+      # Route all browser traffic through Bright Data ISP proxy
+      - CHROME_EXTRA_ARGS=--proxy-server=http://brd.superproxy.io:33335
+    
+    volumes:
+      - /dev/shm:/dev/shm
+    
+    networks:
+      - caddy_default
+    
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/stats', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+networks:
+  caddy_default:
+    external: true

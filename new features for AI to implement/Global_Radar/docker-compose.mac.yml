@@ -1,0 +1,64 @@
+services:
+  seha-radar:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: seha-radar:latest
+    container_name: seha-radar
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      PUBLIC_BASE_URL: http://localhost:8080
+      DAILY_EMAIL_SCHEDULER_ENABLED: "false"
+      DIGEST_SCHEDULER_ENABLED: "false"
+      PERIODIC_SCAN_ENABLED: "false"
+      SYNCDETECTION_ENABLED: "false"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - seharadar_data:/data
+    depends_on:
+      rsshub:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8080/status', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - local
+
+  rsshub:
+    image: diygod/rsshub:latest
+    container_name: seha-rsshub
+    restart: unless-stopped
+    ports:
+      - "1200:1200"
+    environment:
+      ACCESS_KEY: ${RSSHUB_ACCESS_KEY:-}
+      CACHE_EXPIRE: ${RSSHUB_CACHE_EXPIRE:-300}
+      CACHE_TYPE: memory
+      REQUEST_TIMEOUT: ${RSSHUB_REQUEST_TIMEOUT:-30000}
+      RATE_LIMIT_MAX: 100
+      UA: "SehaRadar/1.0 RSSHub (+http://localhost:8080)"
+      REQUEST_RETRY: 3
+      NODE_ENV: production
+      LOG_LEVEL: info
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:1200/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    networks:
+      - local
+
+networks:
+  local:
+    driver: bridge
+
+volumes:
+  seharadar_data:

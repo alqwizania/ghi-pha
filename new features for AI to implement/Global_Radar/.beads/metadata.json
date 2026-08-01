@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "SehaRadar",
+  "project_id": "54861081-6bc3-4f92-b555-b1a18ecc69ff"
+}

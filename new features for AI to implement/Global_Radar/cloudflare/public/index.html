@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SehaRadar - Disease Outbreak Map</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+    <link href="/static/globe/globe.css" rel="stylesheet" />
+    <script defer src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+    <script defer src="https://unpkg.com/deck.gl@^9.0.0/dist.min.js"></script>
+    <script defer src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loading-overlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Initializing SehaRadar...</div>
+    </div>
+
+    <div class="app-layout" id="app-layout">
+        <!-- ===== Header ===== -->
+        <header class="header">
+            <div class="header-left">
+                <div class="header-logo">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
+                    <span data-i18n="logo">SehaRadar</span>
+                </div>
+                <div class="status-pill" id="status-pill">
+                    <div class="status-dot"></div>
+                    <span id="last-updated" data-i18n="loading">Loading...</span>
+                </div>
+                <button class="refresh-btn" id="refresh-btn" onclick="manualRefresh()" title="Refresh data">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                </button>
+            </div>
+            <div class="header-center">
+                <div class="date-range-control" id="date-range-control">
+                    <i data-lucide="calendar-days" class="control-icon"></i>
+                    <div class="date-input-wrap">
+                        <input type="text" class="date-input" id="date-from" inputmode="numeric" placeholder="YYYY-MM-DD" autocomplete="off" />
+                        <div class="control-popover" id="date-from-options"></div>
+                    </div>
+                    <span class="date-separator" data-i18n="date_to_sep">to</span>
+                    <div class="date-input-wrap">
+                        <input type="text" class="date-input" id="date-to" inputmode="numeric" placeholder="YYYY-MM-DD" autocomplete="off" />
+                        <div class="control-popover" id="date-to-options"></div>
+                    </div>
+                    <button class="date-reset-btn" id="date-reset-btn" type="button" onclick="resetDateRange()" title="Reset date range">
+                        <i data-lucide="rotate-ccw" class="control-icon"></i>
+                    </button>
+                </div>
+                <div class="time-filter-control" id="time-filters">
+                    <span class="time-filter-label">Range</span>
+                    <select class="time-filter-select" id="time-filter-select" aria-label="Time range">
+                        <option value="1">24h</option>
+                        <option value="7">7d</option>
+                        <option value="30">30d</option>
+                        <option value="9999" selected>All</option>
+                    </select>
+                </div>
+                <div class="region-presets" id="region-presets">
+                    <button class="region-btn active" data-region="global">Global</button>
+                    <button class="region-btn" data-region="afro">AFRO</button>
+                    <button class="region-btn" data-region="amro">AMRO</button>
+                    <button class="region-btn" data-region="emro">EMRO</button>
+                    <button class="region-btn" data-region="euro">EURO</button>
+                    <button class="region-btn" data-region="searo">SEARO</button>
+                    <button class="region-btn" data-region="wpro">WPRO</button>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="mode-switch">
+                    <a class="mode-link active" href="/map/outbreaks" data-map-mode="outbreaks" data-i18n="mode_outbreaks">Outbreaks</a>
+                </div>
+                <div class="lang-toggle" id="lang-toggle">
+                    <button class="lang-btn active" data-lang="en">EN</button>
+                    <button class="lang-btn" data-lang="ar">AR</button>
+                </div>
+            </div>
+        </header>
+
+        <div class="announcement-bar" role="status" aria-live="polite">
+            <span class="announcement-pill" data-i18n="experimental_notice">News is not refreshed automatically; this release is experimental.</span>
+        </div>
+
+        <!-- ===== Left Sidebar ===== -->
+        <aside class="sidebar left-sidebar" id="left-sidebar">
+            <!-- Overview Stats -->
+            <div class="panel" id="overview-panel">
+                <div class="panel-title">
+                    <span data-i18n="overview">Overview</span>
+                    <span class="badge" id="overview-days">All</span>
+                </div>
+                <div class="stats-groups" id="stats-grid">
+                    <div class="stats-group" id="stats-group-findings">
+                        <div class="stats-group-title" data-i18n="group_all_findings">All Findings</div>
+                        <div class="stats-grid cols-3">
+                            <div class="stat-item interactive" id="card-findings" onclick="setDiseaseFilterMode('all')">
+                                <div class="stat-value" style="color: var(--accent-blue)" id="stat-findings-total">--</div>
+                                <div class="stat-label" data-i18n="findings">Findings</div>
+                            </div>
+                            <div class="stat-item interactive" id="card-news" onclick="setDiseaseFilterMode('news')">
+                                <div class="stat-value" style="color: var(--accent-cyan)" id="stat-news-total">--</div>
+                                <div class="stat-label" data-i18n="news_label">News</div>
+                            </div>
+                            <div class="stat-item interactive" id="card-outbreaks-all" onclick="setDiseaseFilterMode('outbreaks')">
+                                <div class="stat-value" style="color: var(--accent-yellow)" id="stat-outbreaks-total">--</div>
+                                <div class="stat-label" data-i18n="outbreaks_label">Outbreaks</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="stats-group" id="stats-group-outbreak-scope">
+                        <div class="stats-group-title" data-i18n="group_outbreak_scope">Outbreak Scope</div>
+                        <div class="stats-grid cols-3">
+                            <div class="stat-item">
+                                <div class="stat-value" style="color: var(--accent-yellow)" id="stat-outbreaks-only">--</div>
+                                <div class="stat-label" data-i18n="outbreaks_label">Outbreaks</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value" style="color: var(--accent-green)" id="stat-diseases-outbreak">--</div>
+                                <div class="stat-label" data-i18n="diseases_label">Diseases</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value" style="color: var(--accent-blue)" id="stat-countries-outbreak">--</div>
+                                <div class="stat-label" data-i18n="countries">Countries</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="stats-group" id="stats-group-outbreak-risk">
+                        <div class="stats-group-title" data-i18n="group_outbreak_risk">Outbreak Risk</div>
+                        <div class="stats-grid cols-6">
+                            <div class="stat-item"><div class="stat-value" style="color: #64748B" id="stat-risk-unclassified">--</div><div class="stat-label" data-i18n="risk_unclassified">None</div></div>
+                            <div class="stat-item"><div class="stat-value" style="color: #22C55E" id="stat-risk-no-risk">--</div><div class="stat-label" data-i18n="risk_no_risk">No Risk</div></div>
+                            <div class="stat-item"><div class="stat-value" style="color: #84CC16" id="stat-risk-low">--</div><div class="stat-label" data-i18n="risk_low">Low</div></div>
+                            <div class="stat-item"><div class="stat-value" style="color: #EAB308" id="stat-risk-medium">--</div><div class="stat-label" data-i18n="risk_medium">Medium</div></div>
+                            <div class="stat-item"><div class="stat-value" style="color: #F97316" id="stat-risk-high">--</div><div class="stat-label" data-i18n="risk_high">High</div></div>
+                            <div class="stat-item"><div class="stat-value" style="color: #EF4444" id="stat-risk-critical">--</div><div class="stat-label" data-i18n="risk_critical">Critical</div></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel" id="country-search-panel">
+                <div class="panel-title">
+                    <span>Country</span>
+                </div>
+                <div class="country-filter sidebar-country-filter" id="country-filter">
+                    <button class="country-search-action" id="country-search-action" type="button" onclick="handleCountrySearchAction()" title="Country">
+                        <i data-lucide="map-pinned" class="control-icon country-icon-search"></i>
+                        <i data-lucide="x" class="control-icon country-icon-clear"></i>
+                    </button>
+                    <input
+                        id="country-search"
+                        class="country-search-input"
+                        autocomplete="off"
+                        placeholder="Country"
+                    />
+                    <div class="control-popover" id="country-options"></div>
+                </div>
+            </div>
+
+            <!-- Disease Toggles -->
+            <div class="panel" id="diseases-panel">
+                <div class="panel-title">
+                    <span data-i18n="filter_title">Filter</span>
+                    <span class="badge" id="diseases-showing">0/0</span>
+                </div>
+                <div class="disease-tabs" id="disease-tabs">
+                    <button class="disease-tab active" data-tab="diseases" onclick="setDiseaseTab('diseases')">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M8 12h8M12 8v8"/></svg>
+                        <span data-i18n="tab_diseases">Diseases</span>
+                    </button>
+                    <button class="disease-tab" data-tab="news" onclick="setDiseaseTab('news')">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 22h16a2 2 0 002-2V4a2 2 0 00-2-2H8a2 2 0 00-2 2v16a2 2 0 01-2 2zm0 0a2 2 0 01-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8M15 18h-5M10 6h8v4h-8z"/></svg>
+                        <span data-i18n="tab_news">News</span>
+                    </button>
+                </div>
+                <div class="disease-list" id="disease-list"></div>
+            </div>
+
+            <!-- Risk Filter -->
+            <div class="panel" id="risk-panel">
+                <div class="panel-title">
+                    <span data-i18n="risk_title">Risk</span>
+                </div>
+                <div class="risk-list" id="risk-list">
+                    <div class="risk-item active" data-risk="all" onclick="setRiskFilter('all')">
+                        <div class="risk-radio"></div>
+                        <span class="risk-label" data-i18n="all_outbreaks">All outbreaks</span>
+                        <span class="risk-count" id="rcount-all">--</span>
+                    </div>
+                    <div class="risk-item" data-risk="unclassified" onclick="setRiskFilter('unclassified')">
+                        <div class="risk-radio"></div>
+                        <span class="risk-label" data-i18n="risk_unclassified">None</span>
+                        <span class="risk-count" id="rcount-unclassified">--</span>
+                    </div>
+                    <div class="risk-item" data-risk="no_risk" onclick="setRiskFilter('no_risk')">
+                        <div class="risk-radio"></div>
+                        <span class="risk-label" data-i18n="risk_no_risk">No Risk</span>
+                        <span class="risk-count" id="rcount-no-risk">--</span>
+                    </div>
+                    <div class="risk-item" data-risk="low" onclick="setRiskFilter('low')">
+                        <div class="risk-radio"></div>
+                        <span class="risk-label" data-i18n="risk_low">Low</span>
+                        <span class="risk-count" id="rcount-low">--</span>
+                    </div>
+                    <div class="risk-item" data-risk="medium" onclick="setRiskFilter('medium')">
+                        <div class="risk-radio"></div>
+                        <span class="risk-label" data-i18n="risk_medium">Medium</span>
+                        <span class="risk-count" id="rcount-medium">--</span>
+                    </div>
+                    <div class="risk-item" data-risk="high" onclick="setRiskFilter('high')">
+                        <div class="risk-radio"></div>
+                        <span class="risk-label" data-i18n="risk_high">High</span>
+                        <span class="risk-count" id="rcount-high">--</span>
+                    </div>
+                    <div class="risk-item" data-risk="critical" onclick="setRiskFilter('critical')">
+                        <div class="risk-radio"></div>
+                        <span class="risk-label" data-i18n="risk_critical">Critical</span>
+                        <span class="risk-count" id="rcount-critical">--</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- ===== Map ===== -->
+        <div class="globe-container" id="globe-container">
+            <div id="maplibre-container"></div>
+            <div id="deck-canvas"></div>
+            <div class="globe-tooltip" id="globe-tooltip" style="display: none;"></div>
+            <!-- Loading indicator for filter changes -->
+            <div class="map-loading" id="map-loading">
+                <div class="mini-spinner"></div>
+                <span>Updating...</span>
+            </div>
+            <!-- Zoom controls -->
+            <div class="map-controls">
+                <button class="map-control-btn" onclick="mapZoom(1)" title="Zoom in">+</button>
+                <button class="map-control-btn" onclick="mapZoom(-1)" title="Zoom out">&minus;</button>
+                <button class="map-control-btn" onclick="mapReset()" title="Reset view" style="font-size: 0.75rem;">&#8634;</button>
+            </div>
+            <!-- Bottom legend -->
+            <div class="map-legend" id="map-legend"></div>
+        </div>
+
+        <!-- ===== Right Sidebar ===== -->
+        <aside class="sidebar right-sidebar collapsed" id="right-sidebar">
+            <!-- Country Brief (hidden by default) -->
+            <div id="country-brief" style="display: none;"></div>
+
+        </aside>
+
+        <!-- ===== Bottom Ticker ===== -->
+        <div class="ticker" id="ticker">
+            <div class="ticker-label">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                <span data-i18n="alerts">ALERTS</span>
+            </div>
+            <div class="ticker-track">
+                <div class="ticker-content" id="ticker-content">
+                    <span class="ticker-item" style="color: var(--text-muted)" data-i18n="no_alerts">No critical alerts at this time</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script defer src="/static/globe/config.js?v=20260526-title"></script>
+    <script defer src="/static/globe/state.js"></script>
+    <script defer src="/static/globe/selectors.js"></script>
+    <script defer src="/static/globe/data.js"></script>
+    <script defer src="/static/globe/layers.js"></script>
+    <script defer src="/static/globe/travel-ui.js"></script>
+    <script defer src="/static/globe/ui.js"></script>
+    <script defer src="/static/globe/map.js"></script>
+    <script defer src="/static/globe/bootstrap.js"></script>
+</body>
+</html>

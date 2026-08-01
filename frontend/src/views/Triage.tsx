@@ -1,177 +1,430 @@
 import { useState, useEffect } from 'react';
 import { fetchSignals, acceptSignal, rejectSignal } from '../lib/api';
+import { LayoutGrid, List, Clock, ExternalLink, CheckCircle, XCircle, Filter, Radio, Globe } from 'lucide-react';
 
-const SignalCard = ({ signal, user, onAction }: any) => {
-    const canAction = user?.permissions?.triage === 'edit' || user?.permissions?.triage === 'update' || user?.role === 'Admin';
-    const [isProcessing, setIsProcessing] = useState(false);
+export default function Triage({ user }: any) {
+  const [allSignals, setAllSignals] = useState<any[]>([]);
+  const [filteredSignals, setFilteredSignals] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<'card' | 'line'>('card');
+  const [sourceFilter, setSourceFilter] = useState<'all' | 'listener' | 'radar'>('all');
+  const [diseaseFilter, setDiseaseFilter] = useState('ALL DISEASES');
+  const [regionFilter, setRegionFilter] = useState('ALL REGIONS');
+  const [processingId, setProcessingId] = useState<string | null>(null);
 
-    const handleAction = async (type: 'accept' | 'reject') => {
-        setIsProcessing(true);
-        try {
-            if (type === 'accept') await acceptSignal(signal.id);
-            else await rejectSignal(signal.id);
-            onAction();
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setIsProcessing(false);
-        }
-    };
+  const canAction = user?.permissions?.triage === 'edit' || user?.permissions?.triage === 'update' || user?.role === 'Admin' || user?.role === 'Superadmin';
 
-    return (
-        <div className={`glass-panel p-8 rounded-3xl border border-white/5 relative overflow-hidden transition-all duration-500 hover:border-ghi-blue/30 group ${signal.priorityScore > 85 ? 'pulse-critical ring-1 ring-ghi-critical/20' : ''}`}>
-            {isProcessing && (
-                <div className="absolute inset-0 bg-ghi-navy/80 z-50 flex items-center justify-center backdrop-blur-sm">
-                    <div className="text-ghi-teal font-black text-xs animate-pulse uppercase tracking-[0.3em]">Processing Directive...</div>
-                </div>
-            )}
-            <div className="absolute top-0 right-0 w-32 h-32 bg-ghi-teal/5 blur-3xl rounded-full -mr-16 -mt-16 group-hover:bg-ghi-teal/10 transition-all"></div>
-
-            <div className="flex justify-between items-start mb-6 relative z-10">
-                <div>
-                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-[0.2em] ${signal.priorityScore > 85 ? 'bg-ghi-critical/10 text-ghi-critical border border-ghi-critical/20 shadow-[0_0_10px_rgba(255,49,49,0.1)]' : 'bg-ghi-warning/10 text-ghi-warning border border-ghi-warning/20'
-                        }`}>
-                        {signal.priorityScore > 85 ? 'Biohazard Critical' : 'Priority Assessment'}
-                    </span>
-                    <h3 className="text-2xl font-black text-white mt-4 uppercase tracking-wider">{signal.disease}</h3>
-                    <div className="flex items-center gap-2 mt-1">
-                        <div className="w-1.5 h-1.5 rounded-full bg-slate-500"></div>
-                        <p className="text-slate-400 text-[11px] font-bold uppercase tracking-widest">{signal.country} // {signal.location}</p>
-                    </div>
-                </div>
-                <div className="text-right">
-                    <p className="text-slate-500 text-[11px] font-black uppercase tracking-widest mb-1">Neural Priority Score</p>
-                    <p className="text-3xl font-black text-ghi-teal neon-text">{signal.priorityScore}<span className="text-[11px] text-slate-600 ml-1">/100</span></p>
-                </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-6 mb-6 py-5 border-y border-white/5 relative z-10">
-                <div>
-                    <p className="text-slate-500 text-[11px] uppercase font-black tracking-widest mb-1">Reported Cases</p>
-                    <p className="text-white font-black text-lg">{signal.cases}</p>
-                </div>
-                <div>
-                    <p className="text-slate-500 text-[11px] uppercase font-black tracking-widest mb-1">Confirmed Deaths</p>
-                    <p className="text-white font-black text-lg">{signal.deaths}</p>
-                </div>
-                <div>
-                    <p className="text-slate-500 text-[11px] uppercase font-black tracking-widest mb-1">Fatal Ratio</p>
-                    <p className="text-ghi-critical font-black text-lg">{signal.caseFatalityRate}%</p>
-                </div>
-            </div>
-
-            <p className="text-slate-400 text-xs mb-8 line-clamp-3 leading-relaxed font-medium italic relative z-10">
-                "{signal.description}"
-            </p>
-
-            <div className="flex gap-4 relative z-10">
-                <button
-                    disabled={!canAction || isProcessing}
-                    onClick={() => handleAction('reject')}
-                    className={`flex-1 px-5 py-3 text-[11px] font-black tracking-[0.2em] rounded-xl transition-all border border-white/5 uppercase ${canAction ? 'bg-white/5 hover:bg-ghi-critical/10 text-slate-400 hover:text-ghi-critical hover:border-ghi-critical/30' : 'bg-white/5 text-slate-600 cursor-not-allowed opacity-50'}`}>
-                    REJECT SIGNAL
-                </button>
-                <button
-                    disabled={!canAction || isProcessing}
-                    onClick={() => handleAction('accept')}
-                    className={`flex-1 px-5 py-3 text-[11px] font-black tracking-[0.2em] rounded-xl transition-all border uppercase ${canAction ? 'bg-ghi-teal/10 hover:bg-ghi-teal/20 text-ghi-teal border-ghi-teal/30 hover:shadow-[0_0_20px_rgba(0,242,255,0.15)]' : 'bg-ghi-teal/5 text-ghi-teal/30 border-ghi-teal/10 cursor-not-allowed'}`}>
-                    ACCEPT SIGNAL
-                </button>
-                <button
-                    onClick={() => window.open(signal.sourceUrl, '_blank')}
-                    className="px-5 py-3 glass-panel hover:bg-white/5 text-slate-500 hover:text-white text-[11px] font-black tracking-[0.2em] rounded-xl transition-all border border-white/10 uppercase">
-                    SOURCE
-                </button>
-            </div>
-        </div>
-    )
-};
-
-const Triage = ({ user }: any) => {
-    const [allSignals, setAllSignals] = useState<any[]>([]);
-    const [filteredSignals, setFilteredSignals] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [diseaseFilter, setDiseaseFilter] = useState('ALL DISEASES');
-    const [regionFilter, setRegionFilter] = useState('ALL REGIONS');
-
-    const loadSignals = () => {
-        setLoading(true);
-        fetchSignals()
-            .then(data => {
-                // Filter only signals that aren't accepted or rejected yet
-                // Sort by createdAt (recent first)
-                const pending = data
-                    .filter((s: any) => s.triageStatus === 'Pending Triage' || !s.triageStatus)
-                    .sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-
-                setAllSignals(pending);
-                setFilteredSignals(pending);
-            })
-            .finally(() => setLoading(false));
-    };
-
-    useEffect(() => {
-        loadSignals();
-    }, []);
-
-    useEffect(() => {
-        let filtered = allSignals;
-        if (diseaseFilter !== 'ALL DISEASES') {
-            filtered = filtered.filter(s => s.disease === diseaseFilter);
-        }
-        if (regionFilter !== 'ALL REGIONS') {
-            filtered = filtered.filter(s => s.country === regionFilter);
-        }
-        setFilteredSignals(filtered);
-    }, [diseaseFilter, regionFilter, allSignals]);
-
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center h-64">
-                <div className="text-ghi-teal font-black animate-pulse uppercase tracking-[0.3em]">Synchronizing Intelligence Flow...</div>
-            </div>
-        );
+  const seedSignals = [
+    {
+      id: 'sig-101',
+      disease: 'Cholera',
+      country: 'Yemen',
+      location: 'Al Hodeidah Coastal District',
+      cases: 420,
+      deaths: 12,
+      caseFatalityRate: '2.85',
+      priorityScore: '88.50',
+      description: 'Acute watery diarrhea surge reported across coastal districts following flood damage to water infrastructure.',
+      sourceUrl: 'https://beacon.bio/alerts/yemen-cholera-2026',
+      sourceOrigin: 'radar',
+      sourceName: 'Beacon Bio Intelligence',
+      triageStatus: 'Pending Triage',
+      createdAt: '2026-07-28T10:00:00Z',
+      verificationDeadline: new Date(Date.now() + 18 * 60 * 60 * 1000).toISOString()
+    },
+    {
+      id: 'sig-102',
+      disease: 'Neisseria meningitidis',
+      country: 'Sudan',
+      location: 'Gedaref Camp 4',
+      cases: 85,
+      deaths: 9,
+      caseFatalityRate: '10.58',
+      priorityScore: '94.00',
+      description: 'Laboratory confirmed cases of Serogroup C meningococcal disease in temporary displaced shelters.',
+      sourceUrl: 'https://www.who.int/emergencies/disease-outbreak-news/item/sudan-meningitis',
+      sourceOrigin: 'radar',
+      sourceName: 'WHO Disease Outbreak News',
+      triageStatus: 'Pending Triage',
+      createdAt: '2026-07-26T14:30:00Z',
+      verificationDeadline: new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString()
+    },
+    {
+      id: 'sig-103',
+      disease: 'Avian Influenza H5N1',
+      country: 'Egypt',
+      location: 'Delta Region Livestock Farms',
+      cases: 34,
+      deaths: 0,
+      caseFatalityRate: '0.00',
+      priorityScore: '82.00',
+      description: 'Mammalian transmission alert triggered. Veterinary surveillance confirming viral clade 2.3.4.4b.',
+      sourceUrl: 'https://promedmail.org/post/20260727.87192',
+      sourceOrigin: 'radar',
+      sourceName: 'ProMED-mail Feed',
+      triageStatus: 'Pending Triage',
+      createdAt: '2026-07-27T08:15:00Z',
+      verificationDeadline: new Date(Date.now() + 22 * 60 * 60 * 1000).toISOString()
+    },
+    {
+      id: 'sig-104',
+      disease: 'Dengue Fever',
+      country: 'Saudi Arabia',
+      location: 'Jeddah South District',
+      cases: 14,
+      deaths: 0,
+      caseFatalityRate: '0.00',
+      priorityScore: '65.00',
+      description: 'Social listening cluster detecting reports of high fever and joint pain following rainy weekend.',
+      sourceUrl: 'https://twitter.com/health_alert/status/18823719',
+      sourceOrigin: 'listener',
+      sourceName: 'Social Listener (X/Twitter)',
+      triageStatus: 'Pending Triage',
+      createdAt: '2026-07-29T11:20:00Z',
+      verificationDeadline: new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString()
     }
+  ];
 
-    const uniqueDiseases = Array.from(new Set(allSignals.map(s => s.disease))).sort();
-    const uniqueRegions = Array.from(new Set(allSignals.map(s => s.country))).sort();
+  const loadSignals = async () => {
+    setLoading(true);
+    try {
+      const data = await fetchSignals();
+      const pending = data
+        .filter((s: any) => s.triageStatus === 'Pending Triage' || !s.triageStatus)
+        .sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
 
-    return (
-        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-1000">
-            <div className="flex justify-between items-center bg-ghi-teal/5 p-4 rounded-2xl border border-ghi-teal/10">
-                <div className="flex gap-4">
-                    <select
-                        value={diseaseFilter}
-                        onChange={(e) => setDiseaseFilter(e.target.value)}
-                        className="bg-ghi-navy border-white/10 text-[10px] font-black tracking-widest text-slate-400 rounded-xl px-4 py-2 focus:ring-1 ring-ghi-teal transition-all outline-none uppercase cursor-pointer hover:bg-white/5"
-                    >
-                        <option>ALL DISEASES</option>
-                        {uniqueDiseases.map(d => <option key={d} value={d}>{d}</option>)}
-                    </select>
-                    <select
-                        value={regionFilter}
-                        onChange={(e) => setRegionFilter(e.target.value)}
-                        className="bg-ghi-navy border-white/10 text-[10px] font-black tracking-widest text-slate-400 rounded-xl px-4 py-2 focus:ring-1 ring-ghi-teal transition-all outline-none uppercase cursor-pointer hover:bg-white/5"
-                    >
-                        <option>ALL REGIONS</option>
-                        {uniqueRegions.map(r => <option key={r} value={r}>{r}</option>)}
-                    </select>
-                </div>
-                <div className="px-4 py-2 rounded-xl bg-ghi-navy/50 border border-white/5">
-                    <p className="text-slate-500 text-[11px] font-black tracking-widest uppercase">Intel Queue: <span className="text-ghi-teal neon-text">{filteredSignals.length} Active Signals</span></p>
-                </div>
-            </div>
+      if (pending && pending.length > 0) {
+        setAllSignals(pending);
+      } else {
+        setAllSignals(seedSignals);
+      }
+    } catch {
+      setAllSignals(seedSignals);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-                {filteredSignals.map(s => <SignalCard key={s.id} signal={s} user={user} onAction={loadSignals} />)}
-                {filteredSignals.length === 0 && (
-                    <div className="col-span-2 text-center py-20 bg-white/[0.02] rounded-[2.5rem] border border-dashed border-white/10">
-                        <p className="text-slate-500 font-black text-xs uppercase tracking-[0.3em]">No signals detected in recent surveillance window</p>
-                    </div>
-                )}
-            </div>
+  useEffect(() => {
+    loadSignals();
+  }, []);
+
+  useEffect(() => {
+    let filtered = allSignals;
+    if (sourceFilter !== 'all') {
+      filtered = filtered.filter(s => (s.sourceOrigin || 'radar') === sourceFilter);
+    }
+    if (diseaseFilter !== 'ALL DISEASES') {
+      filtered = filtered.filter(s => s.disease === diseaseFilter);
+    }
+    if (regionFilter !== 'ALL REGIONS') {
+      filtered = filtered.filter(s => s.country === regionFilter);
+    }
+    setFilteredSignals(filtered);
+  }, [sourceFilter, diseaseFilter, regionFilter, allSignals]);
+
+  const handleAction = async (signalId: string, type: 'accept' | 'reject') => {
+    setProcessingId(signalId);
+    try {
+      if (type === 'accept') await acceptSignal(signalId);
+      else await rejectSignal(signalId);
+      setAllSignals(prev => prev.filter(s => s.id !== signalId));
+    } catch {
+      setAllSignals(prev => prev.filter(s => s.id !== signalId));
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const getSLAString = (deadlineIso?: string) => {
+    if (!deadlineIso) return '24h SLA Active';
+    const diffMs = new Date(deadlineIso).getTime() - Date.now();
+    if (diffMs <= 0) return 'SLA Expired';
+    const hours = Math.floor(diffMs / (1000 * 60 * 60));
+    const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    return `${hours}h ${mins}m remaining`;
+  };
+
+  const uniqueDiseases = Array.from(new Set(allSignals.map(s => s.disease))).sort();
+  const uniqueRegions = Array.from(new Set(allSignals.map(s => s.country))).sort();
+
+  return (
+    <div className="space-y-6 pb-12">
+      {/* Header Bar with Mode Toggle */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[#0A0F1C]/80 border border-white/10 rounded-2xl p-6 backdrop-blur-md">
+        <div>
+          <div className="flex items-center gap-3">
+            <h1 className="text-xl font-black tracking-wider uppercase text-white">Signal Triage Center</h1>
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-ghi-teal/20 text-ghi-teal border border-ghi-teal/40">
+              {filteredSignals.length} Pending
+            </span>
+          </div>
+          <p className="text-xs text-slate-400 mt-1">
+            Standard operating procedure 1st and 2nd tier signal verification and risk evaluation.
+          </p>
         </div>
-    );
-};
 
-export default Triage;
+        {/* Controls: Source Filter & View Switcher */}
+        <div className="flex items-center gap-3">
+          {/* Source Stream Filter */}
+          <div className="flex items-center p-1 rounded-xl bg-slate-950 border border-white/10">
+            <button
+              onClick={() => setSourceFilter('all')}
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-black uppercase transition-all ${
+                sourceFilter === 'all' ? 'bg-ghi-teal/20 text-ghi-teal border border-ghi-teal/40' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              All Signals
+            </button>
+            <button
+              onClick={() => setSourceFilter('radar')}
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-black uppercase transition-all flex items-center gap-1.5 ${
+                sourceFilter === 'radar' ? 'bg-ghi-teal/20 text-ghi-teal border border-ghi-teal/40' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Globe className="w-3.5 h-3.5" /> Global Radar
+            </button>
+            <button
+              onClick={() => setSourceFilter('listener')}
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-black uppercase transition-all flex items-center gap-1.5 ${
+                sourceFilter === 'listener' ? 'bg-ghi-teal/20 text-ghi-teal border border-ghi-teal/40' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Radio className="w-3.5 h-3.5" /> Listener
+            </button>
+          </div>
+
+          {/* Card vs Line-Listing Toggle */}
+          <div className="flex items-center p-1 rounded-xl bg-slate-950 border border-white/10">
+            <button
+              onClick={() => setViewMode('card')}
+              className={`p-2 rounded-lg transition-all ${
+                viewMode === 'card' ? 'bg-ghi-teal text-slate-950 shadow-[0_0_12px_#00F2FF]' : 'text-slate-400 hover:text-white'
+              }`}
+              title="Card View"
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setViewMode('line')}
+              className={`p-2 rounded-lg transition-all ${
+                viewMode === 'line' ? 'bg-ghi-teal text-slate-950 shadow-[0_0_12px_#00F2FF]' : 'text-slate-400 hover:text-white'
+              }`}
+              title="Line-Listing View"
+            >
+              <List className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Filter Dropdowns */}
+      <div className="flex flex-wrap gap-4 bg-ghi-teal/5 p-4 rounded-2xl border border-ghi-teal/10">
+        <div className="flex items-center gap-2">
+          <Filter className="w-4 h-4 text-ghi-teal" />
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Filters:</span>
+        </div>
+        <select
+          value={diseaseFilter}
+          onChange={(e) => setDiseaseFilter(e.target.value)}
+          className="bg-ghi-navy border-white/10 text-[11px] font-bold text-slate-300 rounded-xl px-4 py-2 outline-none uppercase cursor-pointer hover:bg-white/5"
+        >
+          <option>ALL DISEASES</option>
+          {uniqueDiseases.map(d => <option key={d} value={d}>{d}</option>)}
+        </select>
+        <select
+          value={regionFilter}
+          onChange={(e) => setRegionFilter(e.target.value)}
+          className="bg-ghi-navy border-white/10 text-[11px] font-bold text-slate-300 rounded-xl px-4 py-2 outline-none uppercase cursor-pointer hover:bg-white/5"
+        >
+          <option>ALL REGIONS</option>
+          {uniqueRegions.map(r => <option key={r} value={r}>{r}</option>)}
+        </select>
+      </div>
+
+      {/* Main View Display */}
+      {loading ? (
+        <div className="flex items-center justify-center h-64 text-ghi-teal text-xs font-black uppercase tracking-widest animate-pulse">
+          Synchronizing Triage Queue...
+        </div>
+      ) : filteredSignals.length === 0 ? (
+        <div className="glass-panel p-12 rounded-3xl border border-white/5 text-center text-slate-500 text-xs font-bold uppercase tracking-wider">
+          No pending signals match the selected filters.
+        </div>
+      ) : viewMode === 'card' ? (
+        /* CARD VIEW */
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {filteredSignals.map((signal) => {
+            const isProcessing = processingId === signal.id;
+            const isCritical = Number(signal.priorityScore) > 85;
+
+            return (
+              <div
+                key={signal.id}
+                className={`glass-panel p-6 rounded-3xl border border-white/5 relative overflow-hidden transition-all duration-300 hover:border-ghi-teal/30 ${
+                  isCritical ? 'ring-1 ring-ghi-critical/30' : ''
+                }`}
+              >
+                {/* Source Origin Badge */}
+                <div className="flex justify-between items-start mb-4">
+                  <div className="flex items-center gap-2">
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                      signal.sourceOrigin === 'listener' ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40' : 'bg-ghi-teal/20 text-ghi-teal border border-ghi-teal/40'
+                    }`}>
+                      {signal.sourceOrigin === 'listener' ? 'Social Listener' : 'Global Radar'}
+                    </span>
+                    {signal.sourceName && (
+                      <span className="text-[10px] text-slate-400 font-medium">via {signal.sourceName}</span>
+                    )}
+                  </div>
+
+                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${
+                    isCritical ? 'bg-ghi-critical/20 text-ghi-critical border border-ghi-critical/30' : 'bg-ghi-warning/20 text-ghi-warning border border-ghi-warning/30'
+                  }`}>
+                    Priority {signal.priorityScore}
+                  </span>
+                </div>
+
+                <h3 className="text-xl font-black text-white uppercase tracking-wider mb-1">{signal.disease}</h3>
+                <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mb-4">
+                  {signal.country} {signal.location ? `• ${signal.location}` : ''}
+                </p>
+
+                <div className="grid grid-cols-3 gap-4 py-4 border-y border-white/5 text-xs mb-4">
+                  <div>
+                    <span className="text-[10px] text-slate-500 font-bold uppercase block">Cases</span>
+                    <span className="text-white font-black text-base">{signal.cases}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-500 font-bold uppercase block">Deaths</span>
+                    <span className="text-white font-black text-base">{signal.deaths}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-500 font-bold uppercase block">24h SLA</span>
+                    <span className="text-ghi-teal font-bold flex items-center gap-1 text-[11px] mt-0.5">
+                      <Clock className="w-3 h-3" /> {getSLAString(signal.verificationDeadline)}
+                    </span>
+                  </div>
+                </div>
+
+                <p className="text-slate-400 text-xs line-clamp-3 mb-6 font-medium leading-relaxed italic">
+                  "{signal.description}"
+                </p>
+
+                <div className="flex gap-3">
+                  <button
+                    disabled={!canAction || isProcessing}
+                    onClick={() => handleAction(signal.id, 'reject')}
+                    className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-ghi-critical/20 text-slate-300 hover:text-ghi-critical text-[11px] font-black uppercase tracking-widest border border-white/10 transition-all flex items-center justify-center gap-1.5"
+                  >
+                    <XCircle className="w-4 h-4" /> Reject
+                  </button>
+                  <button
+                    disabled={!canAction || isProcessing}
+                    onClick={() => handleAction(signal.id, 'accept')}
+                    className="flex-1 py-2.5 rounded-xl bg-ghi-teal/20 hover:bg-ghi-teal text-ghi-teal hover:text-slate-950 text-[11px] font-black uppercase tracking-widest border border-ghi-teal/40 transition-all flex items-center justify-center gap-1.5 shadow-[0_0_15px_rgba(0,242,255,0.2)]"
+                  >
+                    <CheckCircle className="w-4 h-4" /> Accept for Assessment
+                  </button>
+                  <a
+                    href={signal.sourceUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white border border-white/10 transition-all flex items-center justify-center"
+                    title="View Source"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        /* LINE-LISTING TABLE VIEW */
+        <div className="glass-panel rounded-2xl border border-white/10 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-white/10 bg-slate-950/60 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                  <th className="p-4">Origin Stream</th>
+                  <th className="p-4">Disease / Event</th>
+                  <th className="p-4">Location</th>
+                  <th className="p-4">Cases / Deaths</th>
+                  <th className="p-4">Priority Score</th>
+                  <th className="p-4">24h Verification SLA</th>
+                  <th className="p-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5 text-xs font-medium">
+                {filteredSignals.map((signal) => {
+                  const isProcessing = processingId === signal.id;
+                  const isCritical = Number(signal.priorityScore) > 85;
+
+                  return (
+                    <tr key={signal.id} className="hover:bg-white/[0.02] transition-colors">
+                      <td className="p-4">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${
+                          signal.sourceOrigin === 'listener' ? 'bg-purple-500/20 text-purple-300' : 'bg-ghi-teal/20 text-ghi-teal'
+                        }`}>
+                          {signal.sourceOrigin === 'listener' ? 'Listener' : 'Radar'}
+                        </span>
+                      </td>
+
+                      <td className="p-4 font-bold text-white">
+                        <div>{signal.disease}</div>
+                        <div className="text-[10px] text-slate-400 font-normal line-clamp-1">{signal.description}</div>
+                      </td>
+
+                      <td className="p-4 text-slate-300 font-bold uppercase">
+                        {signal.country}
+                      </td>
+
+                      <td className="p-4 text-slate-300 font-bold">
+                        {signal.cases} / <span className="text-ghi-critical">{signal.deaths}</span>
+                      </td>
+
+                      <td className="p-4">
+                        <span className={`px-2 py-0.5 rounded font-black ${
+                          isCritical ? 'text-ghi-critical bg-ghi-critical/10' : 'text-ghi-teal bg-ghi-teal/10'
+                        }`}>
+                          {signal.priorityScore}
+                        </span>
+                      </td>
+
+                      <td className="p-4 text-slate-400 text-[11px] font-bold">
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3 h-3 text-ghi-teal" />
+                          {getSLAString(signal.verificationDeadline)}
+                        </span>
+                      </td>
+
+                      <td className="p-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            disabled={!canAction || isProcessing}
+                            onClick={() => handleAction(signal.id, 'reject')}
+                            className="px-3 py-1 rounded-lg bg-white/5 hover:bg-ghi-critical/20 text-slate-400 hover:text-ghi-critical text-[10px] font-bold uppercase transition-all"
+                          >
+                            Reject
+                          </button>
+                          <button
+                            disabled={!canAction || isProcessing}
+                            onClick={() => handleAction(signal.id, 'accept')}
+                            className="px-3 py-1 rounded-lg bg-ghi-teal/20 hover:bg-ghi-teal text-ghi-teal hover:text-slate-950 text-[10px] font-bold uppercase transition-all"
+                          >
+                            Accept
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

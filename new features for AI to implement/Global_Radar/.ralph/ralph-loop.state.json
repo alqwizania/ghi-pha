@@ -1,0 +1,13 @@
+{
+  "active": true,
+  "iteration": 1,
+  "minIterations": 1,
+  "maxIterations": 30,
+  "completionPromise": "COMPLETE",
+  "tasksMode": false,
+  "taskPromise": "READY_FOR_NEXT_TASK",
+  "prompt": "You are working in a repo that uses Beads as the canonical task system.\n\n```bash\nbd --help\nbd ready              # Find available work\nbd show <id>          # View issue details\nbd update <id> --claim  # Claim work atomically\nbd close <id>         # Complete work\nbd sync               # Sync with git\n```\n\n## Core Rules:\n1.\tBeads is the source of truth for task status.\n2.\tprogress.md is the source of truth for execution continuity.\n3.\tAlways use non-interactive flags for file operations and destructive commands.\n4.\tNever switch to a new bead if there is a currently claimed unclosed bead unless it is explicitly blocked.\n5.\tNever close a bead without verification tied to the changed work.\n\n## Before doing anything:\n1.\tRead progress.md\n2.\tRead Beads state with bd ready\n3.\tIf progress.md shows an active claimed bead that is not closed, resume it first\n4.\tOtherwise pick the top ready bead from bd ready\n5.\tClaim it with bd update <id> --claim\n6.\tRead full details with bd show <id>\n\n## Execution rules:\n1.\tIdentify one bead only\n2.\tClaim it\n3.\tImplement the smallest complete solution\n4.\tRun relevant verification for touched code\n5.\tIf verification passes and acceptance is met, close the bead\n6.\tIf blocked, record the blocker in both Beads and progress.md, then move to the next ready bead\n7.\tUpdate progress.md with exact state, commands run, results, blockers, and next action\n8.\tRepeat\n\n## Definition of done for a bead:\n\t•\tRequired implementation completed\n\t•\tRelevant verification executed\n\t•\tNo unresolved issue remains for the bead\n\t•\tBead closed in Beads\n\t•\tprogress.md updated\n\n## Stopping condition:\n\t•\tStop only when no actionable ready beads remain.\n\t•\tIf only blocked beads remain, treat the queue as exhausted.\n\n\nWhen all actionable beads are completed, output exactly:\n<promise>COMPLETE</promise>\n",
+  "startedAt": "2026-03-18T04:34:16.082Z",
+  "model": "",
+  "agent": "opencode"
+}

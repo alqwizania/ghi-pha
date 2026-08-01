@@ -1,0 +1,17 @@
+Red
+Yellow
+Green
+
+Mpox: https://icon-sets.iconify.design/mdi/hand/
+Marburg: https://icon-sets.iconify.design/covid/covid-carrier-blood-2/
+MERS: https://icon-sets.iconify.design/arcticons/emoji-bactrian-camel/
+Cholera:https://icon-sets.iconify.design/entypo/water/
+Measles:https://icon-sets.iconify.design/healthicons/measles/
+H5N1:https://icon-sets.iconify.design/healthicons/animal-chicken-outline/
+Dengue: https://icon-sets.iconify.design/healthicons/mosquito-outline/
+Malaria:https://icon-sets.iconify.design/healthicons/malaria-microscope-outline/
+Ebola:https://icon-sets.iconify.design/lucide/skull/
+COVID19:https://icon-sets.iconify.design/covid/covid-carrier-human/
+yellow fever:https://icon-sets.iconify.design/mi/temperature/
+Polio:https://icon-sets.iconify.design/fontisto/paralysis-disability/
+Lassa fever: https://icon-sets.iconify.design/lucide/rat/

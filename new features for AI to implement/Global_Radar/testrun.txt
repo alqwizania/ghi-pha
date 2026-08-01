@@ -1,0 +1,3 @@
+curl -X POST "https://seha-radar.fayaa92.sa/api/reclassify?limit=1&concurrency=2"
+
+docker logs seha-radar -f --tail 20

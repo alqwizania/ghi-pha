@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import Dashboard from './views/Dashboard';
 import Triage from './views/Triage';
 import AssessmentView from './views/AssessmentView';
-import EscalationView from './views/EscalationView';
+import GlobalRadarView from './views/GlobalRadarView';
 import LoginView from './views/LoginView';
 import UserManagement from './views/UserManagement';
 import ListenerView from './views/ListenerView';
@@ -29,16 +29,16 @@ const DashboardIcon = () => (
   <svg className="w-5 h-5 lg:w-6 lg:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 5a1 1 0 011-1h4a1 1 0 011 1v5a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v2a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h4a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM14 11a1 1 0 011-1h4a1 1 0 011 1v8a1 1 0 01-1 1h-4a1 1 0 01-1-1v-8z"></path></svg>
 );
 
+const RadarIcon = () => (
+  <svg className="w-5 h-5 lg:w-6 lg:h-6 text-ghi-teal" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+);
+
 const TriageIcon = () => (
   <svg className="w-5 h-5 lg:w-6 lg:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>
 );
 
 const AssessmentIcon = () => (
   <svg className="w-5 h-5 lg:w-6 lg:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
-);
-
-const EscalationIcon = () => (
-  <svg className="w-5 h-5 lg:w-6 lg:h-6 text-ghi-critical" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
 );
 
 const ListenerIcon = () => (
@@ -80,10 +80,10 @@ function App() {
 
   const allNavItems = [
     { id: 'dashboard', label: 'DASHBOARD', icon: <DashboardIcon /> },
+    { id: 'radar', label: 'GLOBAL RADAR', icon: <RadarIcon /> },
     { id: 'listener', label: 'LISTENER', icon: <ListenerIcon /> },
     { id: 'triage', label: 'TRIAGE', icon: <TriageIcon /> },
     { id: 'assessments', label: 'ASSESSMENTS', icon: <AssessmentIcon /> },
-    { id: 'escalations', label: 'ESCALATIONS', icon: <EscalationIcon /> },
   ];
 
   const navItems = allNavItems.filter(item => {
@@ -139,7 +139,6 @@ function App() {
           </div>
         </div>
 
-
         <nav className="flex-1 mt-24 lg:mt-8 px-4 space-y-2 overflow-y-auto">
           {navItems.map((item) => (
             <button
@@ -193,17 +192,17 @@ function App() {
               <h2 className="text-2xl font-black text-white tracking-widest uppercase mb-1">{activeView}</h2>
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-ghi-teal shadow-[0_0_8px_#00F2FF]"></div>
-                <p className="text-slate-500 text-[11px] font-bold uppercase tracking-widest">Neural Link: <span className="text-ghi-teal">Active</span></p>
+                <p className="text-slate-500 text-[11px] font-bold uppercase tracking-widest">Surveillance Feed: <span className="text-ghi-teal">Active</span></p>
               </div>
             </div>
           </header>
 
           <div className="relative z-10 flex-1">
             {activeView === 'dashboard' && <Dashboard />}
+            {activeView === 'radar' && <GlobalRadarView user={user} onPromoteToTriage={() => navigate('triage')} />}
             {activeView === 'listener' && <ListenerView user={user} />}
             {activeView === 'triage' && <Triage user={user} />}
             {activeView === 'assessments' && <AssessmentView user={user} />}
-            {activeView === 'escalations' && <EscalationView />}
             {activeView === 'users' && <UserManagement />}
           </div>
         </main>

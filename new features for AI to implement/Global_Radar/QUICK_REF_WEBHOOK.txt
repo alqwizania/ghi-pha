@@ -1,0 +1,177 @@
+╔════════════════════════════════════════════════════════════════════════╗
+║                                                                        ║
+║   NOCODB WEBHOOK - QUICK REFERENCE                                     ║
+║   (What to do about "Cannot edit in read-only editor")                ║
+║                                                                        ║
+╚════════════════════════════════════════════════════════════════════════╝
+
+✅ TL;DR (TOO LONG; DIDN'T READ):
+
+  The Body tab is READ-ONLY by design. This is CORRECT.
+  You only need to add ONE thing: Content-Type header.
+  Ignore the Body tab completely.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎯 YOUR WEBHOOK CONFIGURATION SCREEN:
+
+┌────────────────────────────────────────────────────────────────────┐
+│ Configure Webhook                                                  │
+├────────────────────────────────────────────────────────────────────┤
+│                                                                    │
+│ Title: Email Notification on New Finding                          │
+│ Event: After Insert                                               │
+│ Method: POST                                                       │
+│ URL: https://n8n.fayaa92.sa/webhook/health-finding-notification   │
+│                                                                    │
+│ ╔═══════════╤═════════════╤══════╗                                │
+│ ║ Headers   │ Parameters  │ Body ║                                │
+│ ╚═══════════╧═════════════╧══════╝                                │
+│    ↑             (skip)       ↓                                    │
+│    │                          │                                    │
+│    │                          └─ Shows: "Cannot edit              │
+│    │                             in read-only editor" ✅ NORMAL!  │
+│    │                                                               │
+│    └─ CLICK HERE and add:                                         │
+│       Content-Type: application/json                              │
+│                                                                    │
+└────────────────────────────────────────────────────────────────────┘
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📝 STEP-BY-STEP (30 SECONDS):
+
+  1. Click "Headers" tab (not Body)
+  
+  2. Click "+ Add Header" button
+  
+  3. Two fields appear:
+     ┌─────────────┬────────────────┐
+     │ Content-Type│ application/json│
+     └─────────────┴────────────────┘
+  
+  4. Click "Save"
+  
+  ✅ DONE!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❌ WHAT NOT TO DO:
+
+  × Don't try to edit the Body tab
+  × Don't worry about "Cannot edit in read-only editor" message
+  × Don't look for {{ json event }} syntax to type
+  × Don't try to customize the payload format
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ WHAT TO DO:
+
+  ✓ Just add the Content-Type header
+  ✓ Leave Body tab as read-only preview
+  ✓ Save the webhook
+  ✓ Move on to activating n8n workflow
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📊 CONFIGURATION CHECKLIST:
+
+  Item                          Status    Action
+  ─────────────────────────────────────────────────────────────────
+  Webhook name                  ✅        (already done)
+  Trigger event (After Insert)  ✅        (already done)
+  Method (POST)                 ✅        (already done)
+  URL                           ✅        (already done)
+  Headers                       ⏳        ADD Content-Type ← DO THIS
+  Body                          ✅        (ignore - read-only)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🤔 WHY IS BODY READ-ONLY?
+
+  NocoDB v3 = Automatic payload generation
+  
+  Old way (wrong): Manual payload editing with {{ json event }}
+  New way (right): Auto-generated from table schema ✅
+  
+  Your findings table has these fields:
+  • Id, date, agency, headline, summary, url
+  
+  NocoDB automatically includes ALL of them in the webhook payload.
+  
+  The n8n workflow is already programmed to receive this format.
+  
+  No customization needed!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔍 WHAT NOCODB SENDS (AUTOMATICALLY):
+
+  When you save a new finding, NocoDB sends:
+  
+  {
+    "type": "records.after.insert",
+    "data": {
+      "table_id": "m0s3bmpa8qzp4eh",
+      "table_name": "findings",
+      "rows": [
+        {
+          "Id": 123,
+          "date": "2026-01-31",
+          "agency": "WHO",
+          "headline": "Outbreak detected",
+          "summary": "Details here...",
+          "url": "https://who.int/article"
+        }
+      ]
+    }
+  }
+  
+  ↓
+  
+  n8n receives it
+  
+  ↓
+  
+  Generates HTML email
+  
+  ↓
+  
+  Sends via Gmail ✉️
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🚀 AFTER SAVING NOCODB WEBHOOK:
+
+  Next: Activate n8n workflow
+  
+  Go to: https://n8n.fayaa92.sa/workflow/TKJ32vVmiDgG026N
+  Click: Toggle switch in top-right corner
+  Status: Should turn green/blue "Active"
+  
+  Test:
+  curl -X POST https://n8n.fayaa92.sa/webhook/health-finding-notification \
+    -H "Content-Type: application/json" \
+    -d '{"test":"ping"}'
+  
+  Expected: 200 OK (not 404)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📚 MORE HELP:
+
+  Detailed guide:  /srv/docker/health-agents/NOCODB_BODY_CLARIFICATION.md
+  Full checklist:  /srv/docker/health-agents/SETUP_CHECKLIST.md
+  Visual guide:    /srv/docker/health-agents/FINDING_HEADERS_SECTION.md
+  Helper script:   /srv/docker/health-agents/nocodb-webhook-helper.sh
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💡 KEY POINT:
+
+  "Cannot edit in read-only editor" = SUCCESS! ✅
+  
+  It means NocoDB v3 is working correctly.
+  Just add the Content-Type header and you're done.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

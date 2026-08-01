@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GHI System - Global Health Intelligence Platform Documentation</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Outfit', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            ghi: {
+              navy: '#0A0F1C',
+              dark: '#050811',
+              teal: '#00F2FF',
+              critical: '#FF3131',
+              warning: '#F4B400',
+              success: '#39FF14',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      background-color: #050811;
+      color: #f1f5f9;
+      font-family: 'Outfit', sans-serif;
+      overflow: hidden;
+    }
+    
+    .glass-card {
+      background: rgba(10, 15, 28, 0.92);
+      backdrop-filter: blur(24px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+    
+    .neon-border {
+      box-shadow: 0 0 35px rgba(0, 242, 255, 0.2);
+      border-color: rgba(0, 242, 255, 0.5);
+    }
+
+    .neon-text {
+      text-shadow: 0 0 16px rgba(0, 242, 255, 0.7);
+    }
+
+    .slide {
+      display: none;
+      opacity: 0;
+      transition: opacity 0.4s ease-in-out;
+    }
+
+    .slide.active {
+      display: flex;
+      opacity: 1;
+    }
+  </style>
+</head>
+<body class="h-screen w-screen flex flex-col justify-between p-3 md:p-5 select-none bg-[#050811]">
+
+  <!-- Top Header Navigation & Logos Bar -->
+  <header class="flex justify-between items-center z-50 px-4 w-full shrink-0 mb-2">
+    <!-- Official Logos: PHA English Logo + GHI Emblem -->
+    <div class="flex items-center gap-6">
+      
+      <!-- PHA English Logo (Screenshot 1: PUBLIC HEALTH AUTHORITY - English Only) -->
+      <div class="flex flex-col">
+        <span class="text-sm md:text-base font-black tracking-[0.2em] text-[#00A896] uppercase leading-none">PUBLIC HEALTH AUTHORITY</span>
+      </div>
+
+      <div class="h-6 w-[1px] bg-white/20"></div>
+
+      <!-- GHI Emblem (Screenshot 2: Orbital Globe Radar + GLOBAL HEALTH INTELLIGENCE) -->
+      <div class="flex items-center gap-3">
+        <div class="relative w-9 h-9 flex items-center justify-center">
+          <svg class="w-9 h-9 text-ghi-teal" viewBox="0 0 100 100" fill="none" stroke="currentColor">
+            <circle cx="50" cy="50" r="42" stroke-width="3" opacity="0.4" stroke-dasharray="6 4" />
+            <ellipse cx="50" cy="50" rx="42" ry="18" stroke-width="4" />
+            <ellipse cx="50" cy="50" rx="18" ry="42" stroke-width="4" />
+            <circle cx="50" cy="50" r="8" fill="#00F2FF" />
+          </svg>
+        </div>
+        <div class="flex flex-col">
+          <span class="text-xs md:text-sm font-black tracking-widest text-ghi-teal uppercase leading-none">GLOBAL HEALTH</span>
+          <span class="text-[10px] md:text-xs font-bold tracking-[0.25em] text-slate-400 uppercase leading-tight">INTELLIGENCE</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Slide Navigation & Fullscreen Controls -->
+    <div class="flex items-center gap-3">
+      <div class="flex items-center gap-2 bg-slate-900/90 border border-white/15 px-4 py-2 rounded-xl text-xs md:text-sm font-bold text-slate-300">
+        <span>Slide <strong id="slide-num" class="text-ghi-teal font-black text-base">1</strong> of <span id="slide-total" class="font-bold">8</span></span>
+      </div>
+
+      <button id="prev-btn" onclick="prevSlide()" class="p-2.5 md:p-3 rounded-xl bg-white/5 hover:bg-ghi-teal/20 hover:text-ghi-teal border border-white/15 transition-all cursor-pointer">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+      </button>
+      
+      <button id="next-btn" onclick="nextSlide()" class="p-2.5 md:p-3 rounded-xl bg-ghi-teal text-slate-950 font-black hover:bg-[#33f5ff] transition-all shadow-[0_0_20px_rgba(0,242,255,0.4)] cursor-pointer">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+      </button>
+
+      <button onclick="toggleFullscreen()" class="p-2.5 md:p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/15 text-slate-300 hover:text-white transition-all cursor-pointer" title="Toggle Fullscreen">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN FULL-VIEWPORT STAGE (Fills 96vw x 90vh, Zero Dead Space) -->
+  <main id="presentation-stage" class="w-full h-[calc(100vh-100px)] relative rounded-3xl overflow-hidden glass-card neon-border flex flex-col justify-between p-6 md:p-10 shadow-2xl">
+    
+    <!-- Background Texture -->
+    <div class="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:28px_28px] opacity-25 pointer-events-none"></div>
+
+    <!-- SLIDE 1: COMPREHENSIVE INTRODUCTION TO GHI -->
+    <div class="slide active flex-col justify-between h-full relative z-10">
+      <div class="flex justify-between items-start border-b border-white/10 pb-4">
+        <div>
+          <span class="text-xs md:text-sm font-black uppercase text-ghi-teal tracking-widest">System Overview</span>
+          <h2 class="text-3xl md:text-5xl font-black text-white uppercase tracking-tight mt-1">
+            Global Health Intelligence <span class="text-ghi-teal neon-text">(GHI) System</span>
+          </h2>
+        </div>
+        <span class="px-4 py-1.5 rounded-full text-xs font-black uppercase bg-ghi-teal/20 text-ghi-teal border border-ghi-teal/40">
+          Public Health Authority
+        </span>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-6 my-auto items-center">
+        <div class="md:col-span-7 space-y-4">
+          <p class="text-base md:text-xl text-slate-200 font-semibold leading-relaxed">
+            The <strong class="text-white">Global Health Intelligence (GHI) System</strong> is an advanced, automated event-based epidemiological surveillance platform engineered for the <strong class="text-ghi-teal">Public Health Authority (وقاية)</strong>.
+          </p>
+          <p class="text-sm md:text-base text-slate-400 leading-relaxed font-medium">
+            It aggregates, parses, triages, and evaluates global health signals across 45 primary surveillance networks to detect infectious disease outbreaks, CBRN incidents, and environmental health threats in real time.
+          </p>
+
+          <!-- Core Architecture Pipeline Graph -->
+          <div class="p-4 rounded-2xl bg-slate-950/80 border border-white/10 space-y-2">
+            <span class="text-xs font-black text-ghi-teal uppercase tracking-widest block">Automated End-to-End Pipeline</span>
+            <div class="grid grid-cols-4 gap-2 text-center text-xs font-bold">
+              <div class="p-2.5 rounded-xl bg-ghi-teal/15 text-ghi-teal border border-ghi-teal/30">1. 45 Feeds Scraped</div>
+              <div class="p-2.5 rounded-xl bg-ghi-teal/15 text-ghi-teal border border-ghi-teal/30">2. Dual Triage</div>
+              <div class="p-2.5 rounded-xl bg-ghi-teal/15 text-ghi-teal border border-ghi-teal/30">3. IHR/RRA Risk</div>
+              <div class="p-2.5 rounded-xl bg-ghi-success/20 text-ghi-success border border-ghi-success/40">4. Executive Action</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="md:col-span-5 grid grid-cols-2 gap-4 text-left">
+          <div class="p-5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-1">
+            <span class="text-3xl md:text-4xl font-black text-ghi-teal">45</span>
+            <span class="text-xs text-slate-400 font-bold uppercase block">Ingestion Sources</span>
+            <p class="text-[11px] text-slate-500">WHO, CDC, ProMED, ECDC, Beacon Bio</p>
+          </div>
+          <div class="p-5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-1">
+            <span class="text-3xl md:text-4xl font-black text-ghi-success">24h</span>
+            <span class="text-xs text-slate-400 font-bold uppercase block">Verification SLA</span>
+            <p class="text-[11px] text-slate-500">Mandatory verification countdown</p>
+          </div>
+          <div class="p-5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-1">
+            <span class="text-3xl md:text-4xl font-black text-ghi-warning">100%</span>
+            <span class="text-xs text-slate-400 font-bold uppercase block">Vector Command Map</span>
+            <p class="text-[11px] text-slate-500">React-Simple-Maps GeoMercator</p>
+          </div>
+          <div class="p-5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-1">
+            <span class="text-3xl md:text-4xl font-black text-white">WHO</span>
+            <span class="text-xs text-slate-400 font-bold uppercase block">IHR & RRA Standard</span>
+            <p class="text-[11px] text-slate-500">Evidence-based risk matrix</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex justify-between items-center text-xs text-slate-400 pt-4 border-t border-white/10">
+        <span>Maintained by: Global Health Intelligence Development Team</span>
+        <span class="text-[#00A896] font-bold uppercase">PUBLIC HEALTH AUTHORITY</span>
+      </div>
+    </div>
+
+    <!-- SLIDE 2: GLOBAL RADAR & 45-SOURCE INGESTION ENGINE -->
+    <div class="slide flex-col justify-between h-full relative z-10">
+      <div class="flex justify-between items-start border-b border-white/10 pb-4">
+        <div>
+          <span class="text-xs md:text-sm font-black uppercase text-ghi-teal tracking-widest">Multi-Source Ingestion</span>
+          <h2 class="text-3xl md:text-5xl font-black text-white uppercase tracking-tight mt-1">
+            Global Radar & 45-Source Engine
+          </h2>
+        </div>
+        <span class="px-4 py-1.5 rounded-full text-xs font-black uppercase bg-white/5 text-slate-300 border border-white/10">02 // 08</span>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-6 my-auto items-center">
+        <!-- Left Side: Source Description & Capabilities -->
+        <div class="md:col-span-6 space-y-4">
+          <div class="p-5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-2">
+            <span class="px-2.5 py-1 rounded text-xs font-black uppercase bg-ghi-teal/20 text-ghi-teal border border-ghi-teal/30">Background Automation</span>
+            <h3 class="text-lg font-black text-white uppercase">Serverless Collector Microservices</h3>
+            <p class="text-sm text-slate-300 leading-relaxed font-medium">
+              Runs native Cloudflare Worker background workers polling 45 surveillance sources every 2 hours without manual intervention.
+            </p>
+          </div>
+
+          <div class="p-5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-2">
+            <span class="px-2.5 py-1 rounded text-xs font-black uppercase bg-ghi-success/20 text-ghi-success border border-ghi-success/30">Retrospective Cutoff</span>
+            <h3 class="text-lg font-black text-white uppercase">July 25th, 2026 Baseline Boundary</h3>
+            <p class="text-sm text-slate-300 leading-relaxed font-medium">
+              Enforces a retrospective date cutoff (July 25, 2026) ensuring all historical outbreak backfills and incoming signals post-July 25th are detected and parsed.
+            </p>
+          </div>
+        </div>
+
+        <!-- Right Side: Live Source Monitor & Frequency Graph Visual -->
+        <div class="md:col-span-6 p-6 rounded-3xl bg-slate-950/90 border border-ghi-teal/40 space-y-4 shadow-2xl">
+          <div class="flex justify-between items-center">
+            <h3 class="text-sm font-black text-white uppercase tracking-wider">45 Source Health Status Monitor</h3>
+            <span class="text-xs text-ghi-success font-black uppercase flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-ghi-success animate-ping"></span> All Feeds Active
+            </span>
+          </div>
+
+          <!-- Source Status Grid preview -->
+          <div class="grid grid-cols-2 gap-2 text-xs">
+            <div class="p-2.5 rounded-xl bg-white/[0.03] border border-white/10 flex justify-between items-center">
+              <div><strong class="text-white block">Beacon Bio</strong><span class="text-[10px] text-slate-400">Direct API</span></div>
+              <span class="w-2.5 h-2.5 rounded-full bg-ghi-success shadow-[0_0_8px_#39FF14]"></span>
+            </div>
+            <div class="p-2.5 rounded-xl bg-white/[0.03] border border-white/10 flex justify-between items-center">
+              <div><strong class="text-white block">WHO DONs</strong><span class="text-[10px] text-slate-400">Official Outbreaks</span></div>
+              <span class="w-2.5 h-2.5 rounded-full bg-ghi-success shadow-[0_0_8px_#39FF14]"></span>
+            </div>
+            <div class="p-2.5 rounded-xl bg-white/[0.03] border border-white/10 flex justify-between items-center">
+              <div><strong class="text-white block">CDC Outbreaks</strong><span class="text-[10px] text-slate-400">US CDC Feed</span></div>
+              <span class="w-2.5 h-2.5 rounded-full bg-ghi-success shadow-[0_0_8px_#39FF14]"></span>
+            </div>
+            <div class="p-2.5 rounded-xl bg-white/[0.03] border border-white/10 flex justify-between items-center">
+              <div><strong class="text-white block">ProMED-mail</strong><span class="text-[10px] text-slate-400">Emerging Diseases</span></div>
+              <span class="w-2.5 h-2.5 rounded-full bg-ghi-success shadow-[0_0_8px_#39FF14]"></span>
+            </div>
+            <div class="p-2.5 rounded-xl bg-white/[0.03] border border-white/10 flex justify-between items-center">
+              <div><strong class="text-white block">WHO Mpox API</strong><span class="text-[10px] text-slate-400">Validated Daily</span></div>
+              <span class="w-2.5 h-2.5 rounded-full bg-ghi-success shadow-[0_0_8px_#39FF14]"></span>
+            </div>
+            <div class="p-2.5 rounded-xl bg-white/[0.03] border border-white/10 flex justify-between items-center">
+              <div><strong class="text-white block">GTFCC Cholera</strong><span class="text-[10px] text-slate-400">Global Trends</span></div>
+              <span class="w-2.5 h-2.5 rounded-full bg-ghi-success shadow-[0_0_8px_#39FF14]"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex justify-between items-center text-xs text-slate-400 pt-4 border-t border-white/10">
+        <span>Continuous 24/7 scanning across biological, environmental, and CBRN networks</span>
+        <span class="text-ghi-teal font-bold uppercase">Public Health Authority</span>
+      </div>
+    </div>
+
+    <!-- SLIDE 3: INTERACTIVE WORLD VECTOR COMMAND MAP -->
+    <div class="slide flex-col justify-between h-full relative z-10">
+      <div class="flex justify-between items-start border-b border-white/10 pb-4">
+        <div>
+          <span class="text-xs md:text-sm font-black uppercase text-ghi-teal tracking-widest">Geospatial Intelligence</span>
+          <h2 class="text-3xl md:text-5xl font-black text-white uppercase tracking-tight mt-1">
+            Map-First Geospatial Command Center
+          </h2>
+        </div>
+        <span class="px-4 py-1.5 rounded-full text-xs font-black uppercase bg-white/5 text-slate-300 border border-white/10">03 // 08</span>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-6 my-auto items-center">
+        <!-- Interactive Vector Map Mockup Screen -->
+        <div class="md:col-span-8 p-4 rounded-3xl bg-slate-950/90 border border-ghi-teal/50 shadow-2xl relative overflow-hidden h-72 flex flex-col justify-between">
+          <div class="flex justify-between items-center z-10">
+            <span class="px-3 py-1 rounded-xl text-xs font-black bg-slate-900/90 border border-white/10 text-white">
+              Global Outbreak Threat Map (React-Simple-Maps)
+            </span>
+            <div class="flex items-center gap-1.5 bg-slate-900/90 p-1 rounded-xl border border-white/10 text-[10px] font-bold">
+              <span class="px-2 py-0.5 rounded bg-ghi-teal text-slate-950 font-black">All (45)</span>
+              <span class="px-2 py-0.5 text-slate-400">Biological</span>
+              <span class="px-2 py-0.5 text-slate-400">CBRN</span>
+            </div>
+          </div>
+
+          <!-- SVG World Vector Map Graphic Preview -->
+          <div class="absolute inset-0 flex items-center justify-center opacity-70">
+            <svg class="w-full h-full text-slate-800" viewBox="0 0 1000 500" fill="none" stroke="currentColor">
+              <path d="M150,120 Q200,80 300,140 T500,100 T700,160 T900,120 L950,300 L800,450 L600,400 L400,420 L200,380 Z" fill="#0f172a" stroke="#1e293b" stroke-width="2" />
+              <!-- Outbreak Radar Nodes -->
+              <g transform="translate(520, 220)">
+                <circle r="16" fill="#FF3131" opacity="0.3" class="animate-ping" />
+                <circle r="8" fill="#FF3131" stroke="#ffffff" stroke-width="2" />
+              </g>
+              <g transform="translate(610, 180)">
+                <circle r="12" fill="#00F2FF" opacity="0.4" class="animate-ping" />
+                <circle r="6" fill="#00F2FF" stroke="#ffffff" stroke-width="2" />
+              </g>
+              <g transform="translate(560, 260)">
+                <circle r="10" fill="#F4B400" opacity="0.4" class="animate-ping" />
+                <circle r="5" fill="#F4B400" stroke="#ffffff" stroke-width="2" />
+              </g>
+            </svg>
+          </div>
+
+          <div class="flex justify-between items-center z-10 text-[11px] font-bold text-slate-400">
+            <span>Center: Saudi Arabia & Middle East [35, 20]</span>
+            <div class="flex items-center gap-3">
+              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-ghi-critical"></span> Critical</span>
+              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-ghi-teal"></span> High</span>
+              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-ghi-warning"></span> CBRN</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Map Feature Highlights -->
+        <div class="md:col-span-4 space-y-3 text-xs">
+          <div class="p-4 rounded-2xl bg-white/[0.03] border border-white/10">
+            <h4 class="font-black text-white uppercase text-sm mb-1">100% Vector Map Canvas</h4>
+            <p class="text-slate-300">Renders actual landmass polygons for all continents using <code>countries-110m.json</code>.</p>
+          </div>
+          <div class="p-4 rounded-2xl bg-white/[0.03] border border-white/10">
+            <h4 class="font-black text-white uppercase text-sm mb-1">Interactive Navigation</h4>
+            <p class="text-slate-300">Supports geographic zoom in, zoom out, drag-to-pan, and reset projection.</p>
+          </div>
+          <div class="p-4 rounded-2xl bg-white/[0.03] border border-white/10">
+            <h4 class="font-black text-white uppercase text-sm mb-1">Precise Coordinate Placement</h4>
+            <p class="text-slate-300">Positions outbreak events at exact latitude/longitude with animated severity rings.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex justify-between items-center text-xs text-slate-400 pt-4 border-t border-white/10">
+        <span>Map-first command layout designed for immediate high-density spatial visualization</span>
+        <span class="text-ghi-teal font-bold uppercase">Public Health Authority</span>
+      </div>
+    </div>
+
+    <!-- SLIDE 4: OVERMAP COLLAPSIBLE CONTROL PANELS -->
+    <div class="slide flex-col justify-between h-full relative z-10">
+      <div class="flex justify-between items-start border-b border-white/10 pb-4">
+        <div>
+          <span class="text-xs md:text-sm font-black uppercase text-ghi-teal tracking-widest">UX Control Architecture</span>
+          <h2 class="text-3xl md:text-5xl font-black text-white uppercase tracking-tight mt-1">
+            Overmap Collapsible Control Drawers
+          </h2>
+        </div>
+        <span class="px-4 py-1.5 rounded-full text-xs font-black uppercase bg-white/5 text-slate-300 border border-white/10">04 // 08</span>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 my-auto items-center text-xs">
+        <div class="p-6 rounded-2xl bg-white/[0.03] border border-white/10 space-y-3">
+          <span class="px-2.5 py-1 rounded text-xs font-black uppercase bg-ghi-teal/20 text-ghi-teal border border-ghi-teal/30">Drawer 1</span>
+          <h3 class="text-base font-black text-white uppercase">45 Sources Monitor Drawer</h3>
+          <p class="text-slate-300 leading-relaxed font-medium">
+            Floating panel opening over the map on demand. Displays real-time operational status, fetch intervals, and sync health for all 45 feeds.
+          </p>
+        </div>
+
+        <div class="p-6 rounded-2xl bg-white/[0.03] border border-white/10 space-y-3">
+          <span class="px-2.5 py-1 rounded text-xs font-black uppercase bg-ghi-teal/20 text-ghi-teal border border-ghi-teal/30">Drawer 2</span>
+          <h3 class="text-base font-black text-white uppercase">Live Signals Stream Drawer</h3>
+          <p class="text-slate-300 leading-relaxed font-medium">
+            Collapsible stream sidebar listing live detected outbreaks since July 25th with 1-click <strong>Promote to Triage Queue</strong> buttons.
+          </p>
+        </div>
+
+        <div class="p-6 rounded-2xl bg-white/[0.03] border border-white/10 space-y-3">
+          <span class="px-2.5 py-1 rounded text-xs font-black uppercase bg-ghi-teal/20 text-ghi-teal border border-ghi-teal/30">Node Inspector</span>
+          <h3 class="text-base font-black text-white uppercase">Interactive Node Detail Card</h3>
+          <p class="text-slate-300 leading-relaxed font-medium">
+            Clicking any map node opens an event detail card directly over the map with case counts, fatality ratios, summaries, and source URLs.
+          </p>
+        </div>
+      </div>
+
+      <div class="flex justify-between items-center text-xs text-slate-400 pt-4 border-t border-white/10">
+        <span>Drawers float on top of the vector canvas without obscuring the global map view</span>
+        <span class="text-ghi-teal font-bold uppercase">Public Health Authority</span>
+      </div>
+    </div>
+
+    <!-- SLIDE 5: DUAL-MODE SOP TRIAGE CENTER -->
+    <div class="slide flex-col justify-between h-full relative z-10">
+      <div class="flex justify-between items-start border-b border-white/10 pb-4">
+        <div>
+          <span class="text-xs md:text-sm font-black uppercase text-ghi-teal tracking-widest">Workflow Specialization</span>
+          <h2 class="text-3xl md:text-5xl font-black text-white uppercase tracking-tight mt-1">
+            Dual-Mode SOP Triage Center
+          </h2>
+        </div>
+        <span class="px-4 py-1.5 rounded-full text-xs font-black uppercase bg-white/5 text-slate-300 border border-white/10">05 // 08</span>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 my-auto text-xs">
+        <!-- Visual Card View UI Preview -->
+        <div class="p-6 rounded-3xl bg-slate-950/90 border border-white/15 space-y-4 shadow-xl">
+          <div class="flex justify-between items-center border-b border-white/10 pb-3">
+            <h3 class="text-sm font-black text-white uppercase">1. Visual Card View Mode</h3>
+            <span class="px-2.5 py-1 rounded text-[10px] font-black uppercase bg-ghi-teal/20 text-ghi-teal">Visual Triaging</span>
+          </div>
+
+          <!-- Card View UI Preview Component -->
+          <div class="p-4 rounded-2xl bg-white/[0.03] border border-ghi-teal/40 space-y-2">
+            <div class="flex justify-between items-center text-[10px]">
+              <span class="px-2 py-0.5 rounded bg-ghi-teal/20 text-ghi-teal font-bold">Beacon Bio</span>
+              <span class="px-2 py-0.5 rounded bg-ghi-critical/20 text-ghi-critical font-bold">Score: 92 (Critical)</span>
+            </div>
+            <h4 class="font-bold text-white text-xs">Acute Diarrhea Surge in Coastal Districts</h4>
+            <div class="flex justify-between text-[11px] text-slate-400">
+              <span>Cholera • Yemen</span>
+              <span>420 Cases (2.85% CFR)</span>
+            </div>
+            <div class="flex gap-2 pt-2">
+              <button class="flex-1 py-1.5 rounded-lg bg-ghi-success text-slate-950 font-black text-[10px] uppercase">Accept & Promote</button>
+              <button class="py-1.5 px-3 rounded-lg bg-white/5 text-slate-400 text-[10px] uppercase">Reject</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Line-Listing Table View UI Preview -->
+        <div class="p-6 rounded-3xl bg-slate-950/90 border border-white/15 space-y-4 shadow-xl">
+          <div class="flex justify-between items-center border-b border-white/10 pb-3">
+            <h3 class="text-sm font-black text-white uppercase">2. Line-Listing Table Mode</h3>
+            <span class="px-2.5 py-1 rounded text-[10px] font-black uppercase bg-ghi-teal/20 text-ghi-teal">High-Density Batch</span>
+          </div>
+
+          <!-- Table Preview Component -->
+          <div class="space-y-1 text-[11px]">
+            <div class="grid grid-cols-4 p-2 rounded-lg bg-white/5 font-bold text-slate-400 uppercase text-[9px]">
+              <span>Disease</span><span>Country</span><span>Cases</span><span>Action</span>
+            </div>
+            <div class="grid grid-cols-4 p-2 rounded-lg bg-white/[0.02] border border-white/5 text-white">
+              <span>Cholera</span><span>Yemen</span><span>420</span><span class="text-ghi-teal font-bold">Promote</span>
+            </div>
+            <div class="grid grid-cols-4 p-2 rounded-lg bg-white/[0.02] border border-white/5 text-white">
+              <span>Meningitis</span><span>Sudan</span><span>85</span><span class="text-ghi-teal font-bold">Promote</span>
+            </div>
+            <div class="grid grid-cols-4 p-2 rounded-lg bg-white/[0.02] border border-white/5 text-white">
+              <span>H5N1 Avian</span><span>Egypt</span><span>34</span><span class="text-ghi-teal font-bold">Promote</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="p-4 rounded-xl bg-ghi-teal/10 border border-ghi-teal/30 text-xs flex justify-between items-center">
+        <span><strong>24-Hour Verification SLA Engine:</strong> Live countdown timer enforcing the SOP requirement for 24h sector verification.</span>
+        <span class="text-ghi-teal font-bold uppercase">SOP SLA Enforced</span>
+      </div>
+    </div>
+
+    <!-- SLIDE 6: SOCIAL LISTENER ENGINE -->
+    <div class="slide flex-col justify-between h-full relative z-10">
+      <div class="flex justify-between items-start border-b border-white/10 pb-4">
+        <div>
+          <span class="text-xs md:text-sm font-black uppercase text-ghi-teal tracking-widest">Early Media Intelligence</span>
+          <h2 class="text-3xl md:text-5xl font-black text-white uppercase tracking-tight mt-1">
+            Social Listener & Media Surveillance
+          </h2>
+        </div>
+        <span class="px-4 py-1.5 rounded-full text-xs font-black uppercase bg-white/5 text-slate-300 border border-white/10">06 // 08</span>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 my-auto text-xs">
+        <div class="p-6 rounded-2xl bg-white/[0.03] border border-white/10 space-y-3">
+          <span class="px-2.5 py-1 rounded text-xs font-black uppercase bg-ghi-teal/20 text-ghi-teal border border-ghi-teal/30">Keyword Engine</span>
+          <h3 class="text-base font-black text-white uppercase">Automated Keyword Detection</h3>
+          <p class="text-slate-300 leading-relaxed font-medium">
+            Scans X/Twitter and open media feeds for official keywords: <em>Outbreak, Cluster, Spike in cases, Mystery illness, Hospital overload, Fatalities rising</em>.
+          </p>
+        </div>
+
+        <div class="p-6 rounded-2xl bg-white/[0.03] border border-white/10 space-y-3">
+          <span class="px-2.5 py-1 rounded text-xs font-black uppercase bg-ghi-teal/20 text-ghi-teal border border-ghi-teal/30">Monitored Accounts</span>
+          <h3 class="text-base font-black text-white uppercase">Key Account Tracking</h3>
+          <p class="text-slate-300 leading-relaxed font-medium">
+            Monitors health ministry handles, WHO officials, regional health channels, and verified epidemiologists for early signals.
+          </p>
+        </div>
+
+        <div class="p-6 rounded-2xl bg-white/[0.03] border border-white/10 space-y-3">
+          <span class="px-2.5 py-1 rounded text-xs font-black uppercase bg-ghi-teal/20 text-ghi-teal border border-ghi-teal/30">Signal Conversion</span>
+          <h3 class="text-base font-black text-white uppercase">1-Click Post Promotion</h3>
+          <p class="text-slate-300 leading-relaxed font-medium">
+            1-click action turns verified social media posts into formal GHI surveillance signals for risk evaluation.
+          </p>
+        </div>
+      </div>
+
+      <div class="flex justify-between items-center text-xs text-slate-400 pt-4 border-t border-white/10">
+        <span>Provides early warning days before official international agency reports are published</span>
+        <span class="text-ghi-teal font-bold uppercase">Public Health Authority</span>
+      </div>
+    </div>
+
+    <!-- SLIDE 7: STRUCTURED IHR & RRA RISK ASSESSMENT -->
+    <div class="slide flex-col justify-between h-full relative z-10">
+      <div class="flex justify-between items-start border-b border-white/10 pb-4">
+        <div>
+          <span class="text-xs md:text-sm font-black uppercase text-ghi-teal tracking-widest">WHO Analytical Standard</span>
+          <h2 class="text-3xl md:text-5xl font-black text-white uppercase tracking-tight mt-1">
+            Structured IHR & RRA Risk Assessment
+          </h2>
+        </div>
+        <span class="px-4 py-1.5 rounded-full text-xs font-black uppercase bg-white/5 text-slate-300 border border-white/10">07 // 08</span>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 my-auto text-xs">
+        <div class="p-6 rounded-2xl bg-white/[0.03] border border-white/10 space-y-3">
+          <h3 class="font-black text-white uppercase text-base">International Health Regulations (IHR) Matrix</h3>
+          <ul class="space-y-2 text-slate-300 text-sm">
+            <li>• <strong>Question 1:</strong> Is the public health impact serious?</li>
+            <li>• <strong>Question 2:</strong> Is the event unusual or unexpected?</li>
+            <li>• <strong>Question 3:</strong> Is there a significant risk of international spread?</li>
+            <li>• <strong>Question 4:</strong> Is there a significant risk of travel/trade restrictions?</li>
+          </ul>
+        </div>
+
+        <div class="p-6 rounded-2xl bg-white/[0.03] border border-white/10 space-y-3">
+          <h3 class="font-black text-white uppercase text-base">WHO Rapid Risk Assessment (RRA) Engine</h3>
+          <ul class="space-y-2 text-slate-300 text-sm">
+            <li>• <strong>Hazard Assessment:</strong> Pathogenicity, transmissibility & CFR</li>
+            <li>• <strong>Exposure Assessment:</strong> Population contact & vector dynamics</li>
+            <li>• <strong>Context Assessment:</strong> Healthcare system capacity & resources</li>
+            <li>• <strong>Overall Risk Rating:</strong> Low / Moderate / High / Very High</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="flex justify-between items-center text-xs text-slate-400 pt-4 border-t border-white/10">
+        <span>Ensures national response decisions align strictly with WHO and IHR guidelines</span>
+        <span class="text-ghi-teal font-bold uppercase">Public Health Authority</span>
+      </div>
+    </div>
+
+    <!-- SLIDE 8: SECURITY, GOVERNANCE & ADMIN CONTROLS -->
+    <div class="slide flex-col justify-between h-full relative z-10">
+      <div class="flex justify-between items-start border-b border-white/10 pb-4">
+        <div>
+          <span class="text-xs md:text-sm font-black uppercase text-ghi-teal tracking-widest">Enterprise Architecture</span>
+          <h2 class="text-3xl md:text-5xl font-black text-white uppercase tracking-tight mt-1">
+            Security, Governance & Admin Controls
+          </h2>
+        </div>
+        <span class="px-4 py-1.5 rounded-full text-xs font-black uppercase bg-white/5 text-slate-300 border border-white/10">08 // 08</span>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 my-auto text-xs">
+        <div class="p-6 rounded-2xl bg-white/[0.03] border border-white/10 space-y-3">
+          <h3 class="text-base font-black text-white uppercase">Domain Enforcement</h3>
+          <p class="text-slate-300 leading-relaxed font-medium">
+            Strict authentication enforcing <strong>@pha.gov.sa</strong> email domains across all system user accounts.
+          </p>
+        </div>
+
+        <div class="p-6 rounded-2xl bg-white/[0.03] border border-white/10 space-y-3">
+          <h3 class="text-base font-black text-white uppercase">Role Permissions (RBAC)</h3>
+          <p class="text-slate-300 leading-relaxed font-medium">
+            Granular access controls across Superadmin, Director, Health Expert, and Analyst roles.
+          </p>
+        </div>
+
+        <div class="p-6 rounded-2xl bg-white/[0.03] border border-white/10 space-y-3">
+          <h3 class="text-base font-black text-white uppercase">Reporting Exporter</h3>
+          <p class="text-slate-300 leading-relaxed font-medium">
+            Formatted weekly epidemiological report exporter ready for integration with the Tabadul platform.
+          </p>
+        </div>
+      </div>
+
+      <div class="flex justify-between items-center text-xs text-slate-400 pt-4 border-t border-white/10">
+        <span>Maintained by: Global Health Intelligence Development Team</span>
+        <span class="text-[#00A896] font-bold uppercase">PUBLIC HEALTH AUTHORITY</span>
+      </div>
+    </div>
+
+    <!-- Bottom Footer Controls -->
+    <footer class="flex justify-between items-center z-10 pt-4 border-t border-white/10 text-xs shrink-0">
+      <div class="flex items-center gap-2 text-slate-400 font-bold uppercase">
+        <span class="w-2.5 h-2.5 rounded-full bg-ghi-teal animate-ping"></span>
+        <span>Use Left/Right Arrow Keys or Space to Navigate</span>
+      </div>
+
+      <!-- Slide Indicators Dots -->
+      <div class="flex items-center gap-2" id="dots-container">
+        <!-- JS generated dots -->
+      </div>
+    </footer>
+  </main>
+
+  <script>
+    let currentSlide = 0;
+    const slides = document.querySelectorAll('.slide');
+    const totalSlides = slides.length;
+    const slideNum = document.getElementById('slide-num');
+    const slideTotal = document.getElementById('slide-total');
+    const dotsContainer = document.getElementById('dots-container');
+
+    slideTotal.textContent = totalSlides;
+
+    // Create Indicator Dots
+    slides.forEach((_, idx) => {
+      const dot = document.createElement('button');
+      dot.className = `w-3 h-3 rounded-full transition-all cursor-pointer ${idx === 0 ? 'bg-ghi-teal w-8' : 'bg-white/20 hover:bg-white/40'}`;
+      dot.onclick = () => goToSlide(idx);
+      dotsContainer.appendChild(dot);
+    });
+
+    function updateSlide() {
+      slides.forEach((slide, idx) => {
+        if (idx === currentSlide) {
+          slide.classList.add('active');
+        } else {
+          slide.classList.remove('active');
+        }
+      });
+
+      slideNum.textContent = currentSlide + 1;
+
+      // Update dots
+      const dots = dotsContainer.children;
+      Array.from(dots).forEach((dot, idx) => {
+        if (idx === currentSlide) {
+          dot.className = 'w-8 h-3 rounded-full bg-ghi-teal transition-all';
+        } else {
+          dot.className = 'w-3 h-3 rounded-full bg-white/20 hover:bg-white/40 transition-all';
+        }
+      });
+    }
+
+    function nextSlide() {
+      currentSlide = (currentSlide + 1) % totalSlides;
+      updateSlide();
+    }
+
+    function prevSlide() {
+      currentSlide = (currentSlide - 1 + totalSlides) % totalSlides;
+      updateSlide();
+    }
+
+    function goToSlide(idx) {
+      currentSlide = idx;
+      updateSlide();
+    }
+
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen();
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen();
+        }
+      }
+    }
+
+    // Keyboard Shortcuts
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === ' ') {
+        nextSlide();
+      } else if (e.key === 'ArrowLeft') {
+        prevSlide();
+      } else if (e.key === 'f' || e.key === 'F') {
+        toggleFullscreen();
+      }
+    });
+  </script>
+</body>
+</html>

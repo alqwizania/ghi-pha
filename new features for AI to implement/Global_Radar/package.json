@@ -1,0 +1,49 @@
+{
+  "name": "health-agent-bridge",
+  "version": "2.0.0",
+  "description": "Bridge service connecting ChangeDetection.io to Health Surveillance Agents - Phase 2 Complete",
+  "main": "bridge-service.js",
+  "scripts": {
+    "start": "node bridge-service.js",
+    "dev": "nodemon bridge-service.js",
+    "test": "./run-tests.sh",
+    "test:quick": "node test-bridge.js",
+    "worker:dev": "wrangler dev",
+    "worker:types": "wrangler types cloudflare/src/worker-configuration.d.ts",
+    "worker:check": "tsc --noEmit -p tsconfig.worker.json",
+    "worker:deploy:dry-run": "wrangler deploy --dry-run",
+    "deploy": "wrangler deploy",
+    "findings:backfill:nocodb": "node cloudflare/scripts/backfill-findings-from-nocodb.mjs --database seharadar-prod --remote",
+    "sources:seed": "node cloudflare/scripts/seed-sources.mjs",
+    "sources:seed:mvp": "node cloudflare/scripts/seed-sources.mjs --mvp"
+  },
+  "keywords": [
+    "health",
+    "surveillance",
+    "changedetection",
+    "webhook"
+  ],
+  "author": "FayaaLink Infrastructure",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.13.6",
+    "cheerio": "^1.2.0",
+    "dotenv": "^17.2.3",
+    "express": "^4.18.2",
+    "jsdom": "^23.0.0",
+    "playwright": "^1.53.2",
+    "playwright-extra": "^4.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2"
+  },
+  "overrides": {
+    "minimatch": "3.1.4",
+    "qs": "6.14.2"
+  },
+  "devDependencies": {
+    "@cloudflare/puppeteer": "^1.1.0",
+    "@cloudflare/workers-types": "^4.20260526.1",
+    "nodemon": "^3.0.1",
+    "typescript": "^6.0.3",
+    "wrangler": "^4.94.0"
+  }
+}

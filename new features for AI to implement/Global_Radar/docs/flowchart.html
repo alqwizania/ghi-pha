@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SehaRadar v1.0 - System Flowchart</title>
+    <style>
+        :root {
+            --primary: #0ea5e9;
+            --primary-dark: #0284c7;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --purple: #8b5cf6;
+            --pink: #ec4899;
+            --bg-dark: #0f172a;
+            --bg-card: #1e293b;
+            --bg-node: #334155;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --border: #475569;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, var(--primary), var(--purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+        }
+
+        header p {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            justify-content: center;
+            margin-bottom: 2rem;
+            padding: 1rem;
+            background: var(--bg-card);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+        }
+
+        .flowchart {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            position: relative;
+        }
+
+        .flow-section {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 1.5rem;
+            border: 1px solid var(--border);
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .section-number {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+
+        .section-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .section-subtitle {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            margin-left: auto;
+        }
+
+        /* Source nodes */
+        .sources-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .source-node {
+            background: var(--bg-node);
+            border-radius: 12px;
+            padding: 1rem;
+            text-align: center;
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .source-node:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+        }
+
+        .source-node.changedetection { border-color: var(--primary); }
+        .source-node.rss { border-color: var(--warning); }
+        .source-node.google { border-color: var(--success); }
+        .source-node.manual { border-color: var(--purple); }
+
+        .source-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .source-name {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .source-detail {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .trigger-badge {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: var(--danger);
+            color: white;
+            font-size: 0.65rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 12px;
+            font-weight: bold;
+        }
+
+        /* Arrow connectors */
+        .arrow-down {
+            text-align: center;
+            padding: 0.5rem 0;
+            color: var(--text-secondary);
+        }
+
+        .arrow-down svg {
+            width: 40px;
+            height: 40px;
+        }
+
+        /* Agent pipeline */
+        .pipeline {
+            display: flex;
+            gap: 0.5rem;
+            align-items: stretch;
+            overflow-x: auto;
+            padding-bottom: 0.5rem;
+        }
+
+        .agent-node {
+            flex: 1;
+            min-width: 180px;
+            background: var(--bg-node);
+            border-radius: 12px;
+            padding: 1rem;
+            text-align: center;
+            position: relative;
+            border-top: 3px solid var(--primary);
+        }
+
+        .agent-node.master { border-color: var(--purple); }
+        .agent-node.fetcher { border-color: var(--primary); }
+        .agent-node.epi { border-color: var(--success); }
+        .agent-node.translator { border-color: var(--warning); }
+        .agent-node.database { border-color: var(--pink); }
+
+        .agent-icon {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .agent-name {
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .agent-role {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.75rem;
+        }
+
+        .agent-tools {
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            padding: 0.5rem;
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            text-align: left;
+        }
+
+        .agent-tools li {
+            margin-left: 1rem;
+            margin-bottom: 0.15rem;
+        }
+
+        .pipeline-arrow {
+            display: flex;
+            align-items: center;
+            color: var(--text-secondary);
+            font-size: 1.5rem;
+        }
+
+        /* Process nodes */
+        .process-flow {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .process-step {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem;
+            background: var(--bg-node);
+            border-radius: 12px;
+            border-left: 4px solid var(--primary);
+        }
+
+        .process-step.analysis { border-color: var(--success); }
+        .process-step.translation { border-color: var(--warning); }
+        .process-step.dedup { border-color: var(--danger); }
+        .process-step.storage { border-color: var(--pink); }
+        .process-step.digest { border-color: var(--purple); }
+
+        .step-icon {
+            font-size: 1.5rem;
+            width: 50px;
+            text-align: center;
+        }
+
+        .step-content {
+            flex: 1;
+        }
+
+        .step-title {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .step-detail {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .step-file {
+            font-size: 0.7rem;
+            color: var(--primary);
+            font-family: monospace;
+            margin-top: 0.25rem;
+        }
+
+        /* Data models */
+        .data-model {
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+            padding: 0.75rem;
+            font-family: monospace;
+            font-size: 0.75rem;
+            margin-top: 0.5rem;
+            overflow-x: auto;
+        }
+
+        .data-model .key { color: var(--primary); }
+        .data-model .value { color: var(--success); }
+        .data-model .comment { color: var(--text-secondary); }
+
+        /* Endpoints table */
+        .endpoints-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 0.75rem;
+        }
+
+        .endpoint-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem;
+            background: var(--bg-node);
+            border-radius: 8px;
+        }
+
+        .method {
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            font-family: monospace;
+        }
+
+        .method.get { background: var(--success); color: white; }
+        .method.post { background: var(--primary); color: white; }
+
+        .endpoint-path {
+            font-family: monospace;
+            font-size: 0.8rem;
+            color: var(--text-primary);
+        }
+
+        .endpoint-desc {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            margin-left: auto;
+        }
+
+        /* Stats */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .stat-card {
+            background: var(--bg-node);
+            border-radius: 12px;
+            padding: 1rem;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--primary);
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            margin-top: 3rem;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border);
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+
+        footer a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+
+        /* Animation */
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .live-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(16, 185, 129, 0.1);
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            color: var(--success);
+        }
+
+        .live-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--success);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        /* Mobile responsive */
+        @media (max-width: 768px) {
+            body { padding: 1rem; }
+            header h1 { font-size: 1.75rem; }
+            .pipeline { flex-direction: column; }
+            .pipeline-arrow { transform: rotate(90deg); justify-content: center; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏥 SehaRadar v1.0</h1>
+            <p>AI-Powered Health Surveillance System Architecture</p>
+            <div class="live-indicator" style="margin-top: 1rem; display: inline-flex;">
+                <span class="live-dot"></span>
+                <span>Live System Flowchart</span>
+            </div>
+        </header>
+
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-color" style="background: var(--primary);"></div>
+                <span>ChangeDetection.io</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: var(--warning);"></div>
+                <span>RSS Feeds</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: var(--success);"></div>
+                <span>Google Search</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: var(--purple);"></div>
+                <span>AI Agents</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: var(--pink);"></div>
+                <span>Database/Storage</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: var(--danger);"></div>
+                <span>Deduplication</span>
+            </div>
+        </div>
+
+        <div class="flowchart">
+
+            <!-- Section 1: Data Sources -->
+            <section class="flow-section">
+                <div class="section-header">
+                    <div class="section-number" style="background: var(--primary);">1</div>
+                    <h2 class="section-title">📡 Data Sources</h2>
+                    <span class="section-subtitle">Multi-source health intelligence monitoring</span>
+                </div>
+                <div class="sources-grid">
+                    <div class="source-node changedetection">
+                        <span class="trigger-badge">Webhook</span>
+                        <div class="source-icon">🔍</div>
+                        <div class="source-name">ChangeDetection.io</div>
+                        <div class="source-detail">WHO • CDC • ProMED</div>
+                        <div class="source-detail">Primary real-time source</div>
+                    </div>
+                    <div class="source-node rss">
+                        <span class="trigger-badge" style="background: var(--warning);">6h</span>
+                        <div class="source-icon">📰</div>
+                        <div class="source-name">RSS Feeds</div>
+                        <div class="source-detail">WHO News • CDC Updates</div>
+                        <div class="source-detail">Scheduled every 6 hours</div>
+                    </div>
+                    <div class="source-node google">
+                        <span class="trigger-badge" style="background: var(--success);">Daily</span>
+                        <div class="source-icon">🔎</div>
+                        <div class="source-name">Google Search</div>
+                        <div class="source-detail">Disease-specific queries</div>
+                        <div class="source-detail">Daily at 08:00</div>
+                    </div>
+                    <div class="source-node manual">
+                        <div class="source-icon">✍️</div>
+                        <div class="source-name">Manual Entry</div>
+                        <div class="source-detail">API endpoints</div>
+                        <div class="source-detail">On-demand input</div>
+                    </div>
+                </div>
+            </section>
+
+            <div class="arrow-down">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 4v12m0 0l-4-4m4 4l4-4m-4 8v0" stroke="currentColor" stroke-width="2" fill="none"/>
+                </svg>
+            </div>
+
+            <!-- Section 2: Webhook Reception -->
+            <section class="flow-section">
+                <div class="section-header">
+                    <div class="section-number" style="background: var(--warning);">2</div>
+                    <h2 class="section-title">🔔 Webhook Reception</h2>
+                    <span class="section-subtitle">server.py • POST /webhook/{agency}</span>
+                </div>
+                <div class="process-flow">
+                    <div class="process-step">
+                        <div class="step-icon">📥</div>
+                        <div class="step-content">
+                            <div class="step-title">Receive ChangeDetection.io Webhook</div>
+                            <div class="step-detail">ChangeDetection.io detects content change and sends webhook payload</div>
+                            <div class="step-file">POST /webhook/{agency} → validates against VALID_AGENCIES</div>
+                        </div>
+                    </div>
+                    <div class="process-step">
+                        <div class="step-icon">⚡</div>
+                        <div class="step-content">
+                            <div class="step-title">Background Task Queued</div>
+                            <div class="step-detail">Immediate acknowledgment returned, processing runs in background</div>
+                            <div class="step-file">FastAPI BackgroundTasks • 3 retries with exponential backoff</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <div class="arrow-down">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 4v12m0 0l-4-4m4 4l4-4m-4 8v0" stroke="currentColor" stroke-width="2" fill="none"/>
+                </svg>
+            </div>
+
+            <!-- Section 3: AI Agent Pipeline -->
+            <section class="flow-section">
+                <div class="section-header">
+                    <div class="section-number" style="background: var(--purple);">3</div>
+                    <h2 class="section-title">🤖 AI Agent Pipeline</h2>
+                    <span class="section-subtitle">OpenAI Agents SDK • GPT-4o-mini</span>
+                </div>
+                <div class="pipeline">
+                    <div class="agent-node master">
+                        <div class="agent-icon">🎯</div>
+                        <div class="agent-name">Master Agent</div>
+                        <div class="agent-role">Orchestrator</div>
+                        <ul class="agent-tools">
+                            <li>run_full_pipeline()</li>
+                            <li>run_rss_scan()</li>
+                            <li>run_google_scan()</li>
+                            <li>trigger_email_digest()</li>
+                        </ul>
+                    </div>
+                    <div class="pipeline-arrow">→</div>
+                    <div class="agent-node fetcher">
+                        <div class="agent-icon">📥</div>
+                        <div class="agent-name">Fetcher Agent</div>
+                        <div class="agent-role">Data Collection</div>
+                        <ul class="agent-tools">
+                            <li>fetch_from_changedetection()</li>
+                            <li>fetch_from_rss()</li>
+                            <li>fetch_from_google()</li>
+                        </ul>
+                    </div>
+                    <div class="pipeline-arrow">→</div>
+                    <div class="agent-node epi">
+                        <div class="agent-icon">🔬</div>
+                        <div class="agent-name">Epidemiological</div>
+                        <div class="agent-role">WHO/WHERE/WHEN</div>
+                        <ul class="agent-tools">
+                            <li>analyze_epi_content()</li>
+                            <li>identify_disease()</li>
+                            <li>extract_case_numbers()</li>
+                        </ul>
+                    </div>
+                    <div class="pipeline-arrow">→</div>
+                    <div class="agent-node translator">
+                        <div class="agent-icon">🌍</div>
+                        <div class="agent-name">Translator</div>
+                        <div class="agent-role">EN → AR</div>
+                        <ul class="agent-tools">
+                            <li>translate_to_arabic()</li>
+                            <li>translate_finding()</li>
+                            <li>get_arabic_disease_name()</li>
+                        </ul>
+                    </div>
+                    <div class="pipeline-arrow">→</div>
+                    <div class="agent-node database">
+                        <div class="agent-icon">💾</div>
+                        <div class="agent-name">Database</div>
+                        <div class="agent-role">Storage</div>
+                        <ul class="agent-tools">
+                            <li>write_finding_to_db()</li>
+                            <li>check_duplicate()</li>
+                            <li>query_findings()</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <div class="arrow-down">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 4v12m0 0l-4-4m4 4l4-4m-4 8v0" stroke="currentColor" stroke-width="2" fill="none"/>
+                </svg>
+            </div>
+
+            <!-- Section 4: Processing Pipeline -->
+            <section class="flow-section">
+                <div class="section-header">
+                    <div class="section-number" style="background: var(--success);">4</div>
+                    <h2 class="section-title">⚙️ Processing Pipeline</h2>
+                    <span class="section-subtitle">Analysis → Translation → Deduplication → Storage</span>
+                </div>
+                <div class="process-flow">
+                    <div class="process-step analysis">
+                        <div class="step-icon">🔬</div>
+                        <div class="step-content">
+                            <div class="step-title">Epidemiological Analysis</div>
+                            <div class="step-detail">Extract WHO/WHERE/WHEN triad • Disease identification • Priority assignment (CRITICAL → LOW)</div>
+                            <div class="step-file">tools/epi_triad_analyzer.py</div>
+                            <div class="data-model">
+                                <span class="key">"disease"</span>: <span class="value">"Mpox"</span>, <span class="key">"priority"</span>: <span class="value">"high"</span>,<br>
+                                <span class="key">"short_description_en"</span>: <span class="value">"..."</span>, <span class="key">"detailed_description_en"</span>: <span class="value">"..."</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="process-step translation">
+                        <div class="step-icon">🌍</div>
+                        <div class="step-content">
+                            <div class="step-title">Arabic Translation</div>
+                            <div class="step-detail">GPT-4o-mini powered translation • Modern Standard Arabic • WHO medical terminology</div>
+                            <div class="step-file">tools/arabic_translator.py</div>
+                            <div class="data-model">
+                                <span class="key">"short_description_ar"</span>: <span class="value">"..."</span>,<br>
+                                <span class="key">"detailed_description_ar"</span>: <span class="value">"..."</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="process-step dedup">
+                        <div class="step-icon">🔀</div>
+                        <div class="step-content">
+                            <div class="step-title">Deduplication Check</div>
+                            <div class="step-detail">SHA-256 hash of disease|source|headline • 85% Jaccard similarity threshold</div>
+                            <div class="step-file">tools/deduplication.py</div>
+                            <div class="data-model">
+                                <span class="key">"content_hash"</span>: <span class="value">"a1b2c3..."</span> <span class="comment">// 32-char hash</span><br>
+                                <span class="comment">// Skip if duplicate found in NocoDB</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="process-step storage">
+                        <div class="step-icon">💾</div>
+                        <div class="step-content">
+                            <div class="step-title">NocoDB Storage</div>
+                            <div class="step-detail">Store finding with notification_sent = false • Ready for email digest</div>
+                            <div class="step-file">tools/nocodb_client.py • NocoDBClientV3</div>
+                            <div class="data-model">
+{<br>
+&nbsp;&nbsp;<span class="key">"disease"</span>: <span class="value">"Mpox"</span>, <span class="key">"source"</span>: <span class="value">"WHO"</span>,<br>
+&nbsp;&nbsp;<span class="key">"source_type"</span>: <span class="value">"changedetection"</span>,<br>
+&nbsp;&nbsp;<span class="key">"headline"</span>: <span class="value">"..."</span>,<br>
+&nbsp;&nbsp;<span class="key">"short_description_en"</span>: <span class="value">"..."</span>,<br>
+&nbsp;&nbsp;<span class="key">"detailed_description_ar"</span>: <span class="value">"..."</span>,<br>
+&nbsp;&nbsp;<span class="key">"content_hash"</span>: <span class="value">"32chars"</span>,<br>
+&nbsp;&nbsp;<span class="key">"priority"</span>: <span class="value">"high"</span>,<br>
+&nbsp;&nbsp;<span class="key">"notification_sent"</span>: <span class="value">false</span><br>
+}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <div class="arrow-down">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 4v12m0 0l-4-4m4 4l4-4m-4 8v0" stroke="currentColor" stroke-width="2" fill="none"/>
+                </svg>
+            </div>
+
+            <!-- Section 5: Email Digest -->
+            <section class="flow-section">
+                <div class="section-header">
+                    <div class="section-number" style="background: var(--pink);">5</div>
+                    <h2 class="section-title">📧 Email Digest Generation</h2>
+                    <span class="section-subtitle">Daily at 19:00 • Bilingual EN/AR</span>
+                </div>
+                <div class="process-flow">
+                    <div class="process-step digest">
+                        <div class="step-icon">📊</div>
+                        <div class="step-content">
+                            <div class="step-title">1. Query Unsent Findings</div>
+                            <div class="step-detail">SELECT * FROM findings WHERE notification_sent = false</div>
+                        </div>
+                    </div>
+                    <div class="process-step digest">
+                        <div class="step-icon">📋</div>
+                        <div class="step-content">
+                            <div class="step-title">2. Group by Priority</div>
+                            <div class="step-detail">CRITICAL (red) → HIGH (orange) → MEDIUM (yellow) → LOW (green)</div>
+                        </div>
+                    </div>
+                    <div class="process-step digest">
+                        <div class="step-icon">🎨</div>
+                        <div class="step-content">
+                            <div class="step-title">3. Render Bilingual HTML</div>
+                            <div class="step-detail">English section (LTR) + Arabic section (RTL) in single email</div>
+                            <div class="step-file">tools/email_digest.py</div>
+                        </div>
+                    </div>
+                    <div class="process-step digest">
+                        <div class="step-icon">🚀</div>
+                        <div class="step-content">
+                            <div class="step-title">4. Send to n8n Webhook</div>
+                            <div class="step-detail">N8N_DIGEST_WEBHOOK_URL receives DigestReport payload</div>
+                        </div>
+                    </div>
+                    <div class="process-step digest">
+                        <div class="step-icon">✅</div>
+                        <div class="step-content">
+                            <div class="step-title">5. Mark as Sent</div>
+                            <div class="step-detail">UPDATE findings SET notification_sent = true WHERE id IN (...)</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <div class="arrow-down">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 4v12m0 0l-4-4m4 4l4-4m-4 8v0" stroke="currentColor" stroke-width="2" fill="none"/>
+                </svg>
+            </div>
+
+            <!-- Section 6: API Endpoints -->
+            <section class="flow-section">
+                <div class="section-header">
+                    <div class="section-number" style="background: var(--text-secondary);">6</div>
+                    <h2 class="section-title">🔌 API Endpoints</h2>
+                    <span class="section-subtitle">FastAPI • server.py</span>
+                </div>
+                <div class="endpoints-grid">
+                    <div class="endpoint-item">
+                        <span class="method get">GET</span>
+                        <span class="endpoint-path">/status</span>
+                        <span class="endpoint-desc">Health check</span>
+                    </div>
+                    <div class="endpoint-item">
+                        <span class="method post">POST</span>
+                        <span class="endpoint-path">/webhook/{agency}</span>
+                        <span class="endpoint-desc">Webhook receiver</span>
+                    </div>
+                    <div class="endpoint-item">
+                        <span class="method post">POST</span>
+                        <span class="endpoint-path">/api/scan-unified</span>
+                        <span class="endpoint-desc">Primary scan</span>
+                    </div>
+                    <div class="endpoint-item">
+                        <span class="method post">POST</span>
+                        <span class="endpoint-path">/api/scan-rss</span>
+                        <span class="endpoint-desc">RSS scan</span>
+                    </div>
+                    <div class="endpoint-item">
+                        <span class="method post">POST</span>
+                        <span class="endpoint-path">/api/scan-google</span>
+                        <span class="endpoint-desc">Google scan</span>
+                    </div>
+                    <div class="endpoint-item">
+                        <span class="method post">POST</span>
+                        <span class="endpoint-path">/api/trigger-digest</span>
+                        <span class="endpoint-desc">Send digest</span>
+                    </div>
+                    <div class="endpoint-item">
+                        <span class="method get">GET</span>
+                        <span class="endpoint-path">/api/findings</span>
+                        <span class="endpoint-desc">Query findings</span>
+                    </div>
+                    <div class="endpoint-item">
+                        <span class="method get">GET</span>
+                        <span class="endpoint-path">/api/statistics</span>
+                        <span class="endpoint-desc">System stats</span>
+                    </div>
+                    <div class="endpoint-item">
+                        <span class="method get">GET</span>
+                        <span class="endpoint-path">/api/sources</span>
+                        <span class="endpoint-desc">List sources</span>
+                    </div>
+                    <div class="endpoint-item">
+                        <span class="method get">GET</span>
+                        <span class="endpoint-path">/dashboard</span>
+                        <span class="endpoint-desc">Live dashboard</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- System Overview Stats -->
+            <section class="flow-section">
+                <div class="section-header">
+                    <div class="section-number" style="background: var(--purple);">📊</div>
+                    <h2 class="section-title">System Overview</h2>
+                    <span class="section-subtitle">Key Files & Components</span>
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value">5</div>
+                        <div class="stat-label">AI Agents</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">4</div>
+                        <div class="stat-label">Data Sources</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">10+</div>
+                        <div class="stat-label">API Endpoints</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">2</div>
+                        <div class="stat-label">Languages (EN/AR)</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">4</div>
+                        <div class="stat-label">Priority Levels</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">19:00</div>
+                        <div class="stat-label">Daily Digest</div>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+
+        <footer>
+            <p><strong>SehaRadar v1.0</strong> — AI-Powered Health Surveillance System</p>
+            <p>Stack: Python 3.11+ • FastAPI • Pydantic • OpenAI Agents SDK • httpx • Docker</p>
+            <p style="margin-top: 0.5rem;">
+                📁 <code>/srv/docker/SehaRadar</code> • 
+                <a href="/dashboard">Dashboard</a> • 
+                <a href="/status">Status</a> • 
+                <a href="/api/statistics">Statistics</a>
+            </p>
+        </footer>
+    </div>
+</body>
+</html>

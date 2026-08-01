@@ -1,0 +1,1117 @@
+{
+  "diseases": [
+    {
+      "name": "Mpox",
+      "aliases": [
+        "Monkeypox",
+        "MPX"
+      ],
+      "arabic_name": "جدري القردة",
+      "keywords_en": [
+        "mpox",
+        "monkeypox",
+        "orthopoxvirus"
+      ],
+      "keywords_ar": [
+        "جدري القردة"
+      ],
+      "priority": "high",
+      "who_classification": "Public Health Emergency of International Concern"
+    },
+    {
+      "name": "Marburg",
+      "aliases": [
+        "Marburg virus disease",
+        "MVD"
+      ],
+      "arabic_name": "مرض فيروس ماربورغ",
+      "keywords_en": [
+        "marburg",
+        "filovirus",
+        "marburg virus"
+      ],
+      "keywords_ar": [
+        "ماربورغ",
+        "فيروس ماربورغ"
+      ],
+      "priority": "critical",
+      "who_classification": "Highly pathogenic"
+    },
+    {
+      "name": "MERS",
+      "aliases": [
+        "MERS-CoV",
+        "Middle East Respiratory Syndrome"
+      ],
+      "arabic_name": "متلازمة الشرق الأوسط التنفسية",
+      "keywords_en": [
+        "MERS",
+        "MERS-CoV",
+        "Middle East Respiratory Syndrome"
+      ],
+      "keywords_ar": [
+        "ميرس",
+        "متلازمة الشرق الأوسط"
+      ],
+      "priority": "high",
+      "who_classification": "Zoonotic"
+    },
+    {
+      "name": "Cholera",
+      "aliases": [
+        "Vibrio cholerae"
+      ],
+      "arabic_name": "الكوليرا",
+      "keywords_en": [
+        "cholera",
+        "vibrio cholerae"
+      ],
+      "keywords_ar": [
+        "كوليرا"
+      ],
+      "priority": "high",
+      "who_classification": "Endemic in many regions"
+    },
+    {
+      "name": "Measles",
+      "aliases": [
+        "Rubeola"
+      ],
+      "arabic_name": "الحصبة",
+      "keywords_en": [
+        "measles",
+        "rubeola"
+      ],
+      "keywords_ar": [
+        "حصبة"
+      ],
+      "priority": "medium",
+      "who_classification": "Vaccine-preventable"
+    },
+    {
+      "name": "H5N1",
+      "aliases": [
+        "Avian Influenza",
+        "Bird Flu"
+      ],
+      "arabic_name": "إنفلونزا الطيور",
+      "keywords_en": [
+        "H5N1",
+        "avian influenza",
+        "bird flu"
+      ],
+      "keywords_ar": [
+        "إنفلونزا الطيور",
+        "أنفلونزا الطيور"
+      ],
+      "priority": "high",
+      "who_classification": "Zoonotic with pandemic potential"
+    },
+    {
+      "name": "Dengue",
+      "aliases": [
+        "Dengue fever",
+        "Breakbone fever"
+      ],
+      "arabic_name": "حمى الضنك",
+      "keywords_en": [
+        "dengue",
+        "dengue fever",
+        "aedes"
+      ],
+      "keywords_ar": [
+        "حمى الضنك",
+        "الضنك"
+      ],
+      "priority": "medium",
+      "who_classification": "Vector-borne"
+    },
+    {
+      "name": "Ebola",
+      "aliases": [
+        "Ebola virus disease",
+        "EVD"
+      ],
+      "arabic_name": "فيروس إيبولا",
+      "keywords_en": [
+        "ebola",
+        "ebola virus",
+        "EVD",
+        "filovirus"
+      ],
+      "keywords_ar": [
+        "إيبولا",
+        "فيروس إيبولا"
+      ],
+      "priority": "critical",
+      "who_classification": "Highly pathogenic"
+    },
+    {
+      "name": "COVID-19",
+      "aliases": [
+        "SARS-CoV-2",
+        "Coronavirus"
+      ],
+      "arabic_name": "كوفيد-19",
+      "keywords_en": [
+        "covid",
+        "covid-19",
+        "sars-cov-2",
+        "coronavirus"
+      ],
+      "keywords_ar": [
+        "كوفيد",
+        "كورونا"
+      ],
+      "priority": "high",
+      "who_classification": "Pandemic"
+    },
+    {
+      "name": "Yellow Fever",
+      "aliases": [
+        "YF"
+      ],
+      "arabic_name": "الحمى الصفراء",
+      "keywords_en": [
+        "yellow fever",
+        "YF",
+        "aedes aegypti"
+      ],
+      "keywords_ar": [
+        "الحمى الصفراء"
+      ],
+      "priority": "medium",
+      "who_classification": "Vaccine-preventable"
+    },
+    {
+      "name": "Polio",
+      "aliases": [
+        "Poliomyelitis",
+        "cVDPV2"
+      ],
+      "arabic_name": "شلل الأطفال",
+      "keywords_en": [
+        "polio",
+        "cvdpv2",
+        "vaccine-derived poliovirus",
+        "poliovirus",
+        "circulating vaccine-derived poliovirus type 2",
+        "poliomyelitis"
+      ],
+      "keywords_ar": [
+        "شلل الأطفال",
+        "بوليو"
+      ],
+      "priority": "high",
+      "who_classification": "Vaccine-preventable"
+    },
+    {
+      "name": "Lassa Fever",
+      "aliases": [
+        "Lassa hemorrhagic fever"
+      ],
+      "arabic_name": "حمى لاسا",
+      "keywords_en": [
+        "lassa",
+        "lassa fever",
+        "arenavirus"
+      ],
+      "keywords_ar": [
+        "حمى لاسا",
+        "لاسا"
+      ],
+      "priority": "high",
+      "who_classification": "Viral hemorrhagic fever"
+    },
+    {
+      "name": "Malaria",
+      "aliases": [
+        "Plasmodium falciparum",
+        "Plasmodium vivax"
+      ],
+      "arabic_name": "الملاريا",
+      "keywords_en": [
+        "malaria",
+        "plasmodium",
+        "plasmodium falciparum",
+        "plasmodium vivax",
+        "anopheles"
+      ],
+      "keywords_ar": [
+        "الملاريا",
+        "ملاريا"
+      ],
+      "priority": "medium",
+      "who_classification": "Vector-borne parasitic disease"
+    },
+    {
+      "name": "Nipah",
+      "aliases": [
+        "Nipah virus",
+        "Nipah virus infection",
+        "Nipah virus disease",
+        "NiV"
+      ],
+      "arabic_name": "فيروس نيباه",
+      "keywords_en": [
+        "niv",
+        "nipah virus",
+        "nipa virus",
+        "nipah virus disease",
+        "nipah disease",
+        "nipah",
+        "henipavirus",
+        "nipah virus infection",
+        "nipa"
+      ],
+      "keywords_ar": [
+        "نيباه",
+        "فيروس نيباه"
+      ],
+      "priority": "critical",
+      "who_classification": "Zoonotic with pandemic potential"
+    },
+    {
+      "name": "Rift Valley Fever",
+      "aliases": [
+        "RVF",
+        "Rift Valley fever virus"
+      ],
+      "arabic_name": "حمى الوادي المتصدع",
+      "keywords_en": [
+        "rift valley fever",
+        "rvf",
+        "rift valley"
+      ],
+      "keywords_ar": [
+        "حمى الوادي المتصدع"
+      ],
+      "priority": "high",
+      "who_classification": "Zoonotic viral hemorrhagic fever"
+    },
+    {
+      "name": "Plague",
+      "aliases": [
+        "Bubonic plague",
+        "Pneumonic plague",
+        "Yersinia pestis"
+      ],
+      "arabic_name": "الطاعون",
+      "keywords_en": [
+        "plague",
+        "bubonic plague",
+        "pneumonic plague",
+        "yersinia pestis"
+      ],
+      "keywords_ar": [
+        "الطاعون",
+        "طاعون"
+      ],
+      "priority": "critical",
+      "who_classification": "Highly pathogenic bacterial disease"
+    },
+    {
+      "name": "Diphtheria",
+      "aliases": [
+        "Corynebacterium diphtheriae"
+      ],
+      "arabic_name": "الدفتيريا",
+      "keywords_en": [
+        "diphtheria",
+        "diphtheritic disease",
+        "corynebacterium diphtheriae",
+        "respiratory infection",
+        "respiratory diphtheria"
+      ],
+      "keywords_ar": [
+        "الدفتيريا",
+        "دفتيريا",
+        "الخناق"
+      ],
+      "priority": "medium",
+      "who_classification": "Vaccine-preventable"
+    },
+    {
+      "name": "Rabies",
+      "aliases": [
+        "Rabies virus",
+        "Lyssavirus"
+      ],
+      "arabic_name": "داء الكلب",
+      "keywords_en": [
+        "rabid",
+        "canine rabies",
+        "viral disease",
+        "rabies",
+        "hydrophobia",
+        "animal bite",
+        "lyssavirus",
+        "rabies virus"
+      ],
+      "keywords_ar": [
+        "داء الكلب",
+        "كلب"
+      ],
+      "priority": "high",
+      "who_classification": "Zoonotic viral disease"
+    },
+    {
+      "name": "Influenza",
+      "aliases": [
+        "Seasonal influenza",
+        "Flu",
+        "Influenza A",
+        "Influenza B"
+      ],
+      "arabic_name": "الإنفلونزا",
+      "keywords_en": [
+        "influenza",
+        "h3n2",
+        "influenza a",
+        "seasonal flu",
+        "influenza b",
+        "seasonal influenza",
+        "flu"
+      ],
+      "keywords_ar": [
+        "الإنفلونزا",
+        "إنفلونزا",
+        "الأنفلونزا"
+      ],
+      "priority": "medium",
+      "who_classification": "Respiratory viral disease"
+    },
+    {
+      "name": "Hepatitis",
+      "aliases": [
+        "Hepatitis A",
+        "Hepatitis B",
+        "Hepatitis C",
+        "Hepatitis E",
+        "Viral hepatitis",
+        "Hepatitis B and C"
+      ],
+      "arabic_name": "التهاب الكبد",
+      "keywords_en": [
+        "hav",
+        "hbv",
+        "hcv",
+        "hep a",
+        "hep e",
+        "hepatitis",
+        "hepatitis a",
+        "hepatitis b",
+        "hepatitis b and c",
+        "hepatitis c",
+        "hepatitis e",
+        "liver inflammation",
+        "viral hepatitis",
+        "viral hepatitis a",
+        "viral hepatitis e"
+      ],
+      "keywords_ar": [
+        "التهاب الكبد",
+        "الكبد الوبائي"
+      ],
+      "priority": "medium",
+      "who_classification": "Viral liver disease"
+    },
+    {
+      "name": "Meningitis",
+      "aliases": [
+        "Meningococcal meningitis",
+        "Bacterial meningitis",
+        "Neisseria meningitidis",
+        "Meningococcal disease"
+      ],
+      "arabic_name": "التهاب السحايا",
+      "keywords_en": [
+        "bacterial meningitis",
+        "meningitis",
+        "meningococcal",
+        "meningococcal disease",
+        "meningococcal meningitis",
+        "neisseria meningitidis",
+        "paenibacillus dendritiformis",
+        "viral meningitis"
+      ],
+      "keywords_ar": [
+        "التهاب السحايا",
+        "سحايا"
+      ],
+      "priority": "high",
+      "who_classification": "Bacterial infectious disease"
+    },
+    {
+      "name": "Tuberculosis",
+      "aliases": [
+        "TB",
+        "Mycobacterium tuberculosis"
+      ],
+      "arabic_name": "السل",
+      "keywords_en": [
+        "tuberculosis",
+        "consumption",
+        "mycobacterium tuberculosis",
+        "phthisis",
+        "tb"
+      ],
+      "keywords_ar": [
+        "السل",
+        "التدرن"
+      ],
+      "priority": "medium",
+      "who_classification": "Bacterial infectious disease"
+    },
+    {
+      "name": "Zika",
+      "aliases": [
+        "Zika virus",
+        "Zika virus disease",
+        "Zika fever",
+        "ZIKV"
+      ],
+      "arabic_name": "فيروس زيكا",
+      "keywords_en": [
+        "zika",
+        "zika virus",
+        "zikv",
+        "zika fever"
+      ],
+      "keywords_ar": [
+        "زيكا",
+        "فيروس زيكا"
+      ],
+      "priority": "medium",
+      "who_classification": "Vector-borne viral disease"
+    },
+    {
+      "name": "Chikungunya",
+      "aliases": [
+        "Chikungunya virus",
+        "CHIKV"
+      ],
+      "arabic_name": "شيكونغونيا",
+      "keywords_en": [
+        "chikv",
+        "chikungunya fever",
+        "chikungunya",
+        "chikungunya virus"
+      ],
+      "keywords_ar": [
+        "شيكونغونيا"
+      ],
+      "priority": "medium",
+      "who_classification": "Vector-borne viral disease"
+    },
+    {
+      "name": "Anthrax",
+      "aliases": [
+        "Bacillus anthracis",
+        "Cutaneous anthrax",
+        "Inhalation anthrax"
+      ],
+      "arabic_name": "الجمرة الخبيثة",
+      "keywords_en": [
+        "anthrax",
+        "bacillus anthracis",
+        "cutaneous anthrax"
+      ],
+      "keywords_ar": [
+        "الجمرة الخبيثة",
+        "جمرة خبيثة"
+      ],
+      "priority": "high",
+      "who_classification": "Zoonotic bacterial disease"
+    },
+    {
+      "name": "Pertussis",
+      "aliases": [
+        "Whooping cough",
+        "Bordetella pertussis"
+      ],
+      "arabic_name": "السعال الديكي",
+      "keywords_en": [
+        "pertussis",
+        "whooping cough",
+        "bordetella pertussis"
+      ],
+      "keywords_ar": [
+        "السعال الديكي",
+        "الشاهوق"
+      ],
+      "priority": "medium",
+      "who_classification": "Vaccine-preventable bacterial disease"
+    },
+    {
+      "name": "Typhoid",
+      "aliases": [
+        "Typhoid fever",
+        "Salmonella typhi",
+        "Enteric fever"
+      ],
+      "arabic_name": "حمى التيفوئيد",
+      "keywords_en": [
+        "typhoid",
+        "typhoid fever",
+        "salmonella typhi",
+        "enteric fever"
+      ],
+      "keywords_ar": [
+        "حمى التيفوئيد",
+        "التيفوئيد"
+      ],
+      "priority": "medium",
+      "who_classification": "Bacterial enteric disease"
+    },
+    {
+      "name": "Oropouche",
+      "aliases": [
+        "Oropouche virus",
+        "Oropouche fever",
+        "OROV"
+      ],
+      "arabic_name": "فيروس أوروبوتشي",
+      "keywords_en": [
+        "oropouche",
+        "oropouche virus",
+        "oropouche fever",
+        "orov"
+      ],
+      "keywords_ar": [
+        "أوروبوتشي"
+      ],
+      "priority": "medium",
+      "who_classification": "Vector-borne viral disease"
+    },
+    {
+      "name": "Endophthalmitis",
+      "aliases": [],
+      "arabic_name": "التهاب باطن المقلة",
+      "keywords_en": [
+        "endophthalmitis",
+        "cataract surgery complications",
+        "post-surgical infection"
+      ],
+      "keywords_ar": [],
+      "priority": "medium",
+      "who_classification": "Auto-discovered"
+    },
+    {
+      "name": "African Swine Fever",
+      "aliases": [],
+      "arabic_name": "حمى الخنازير الأفريقية",
+      "keywords_en": [
+        "african swine fever",
+        "swine fever",
+        "asf"
+      ],
+      "keywords_ar": [],
+      "priority": "medium",
+      "who_classification": "Auto-discovered"
+    },
+    {
+      "name": "Leptospirosis",
+      "aliases": [],
+      "arabic_name": "داء البريميات",
+      "keywords_en": [
+        "waterborne disease",
+        "leptospirosis",
+        "leptospira",
+        "lepto"
+      ],
+      "keywords_ar": [],
+      "priority": "medium",
+      "who_classification": "Auto-discovered"
+    },
+    {
+      "name": "Bacillus cereus",
+      "aliases": [],
+      "arabic_name": "عصيات سيريوس",
+      "keywords_en": [
+        "bacillus cereus",
+        "diarrhea",
+        "infant formula",
+        "foodborne illness",
+        "cereulide"
+      ],
+      "keywords_ar": [],
+      "priority": "medium",
+      "who_classification": "Auto-discovered"
+    },
+    {
+      "name": "Chronic Wasting Disease",
+      "aliases": [],
+      "arabic_name": "مرض الهزال المزمن",
+      "keywords_en": [
+        "chronic wasting disease",
+        "cwd"
+      ],
+      "keywords_ar": [],
+      "priority": "medium",
+      "who_classification": "Auto-discovered"
+    },
+    {
+      "name": "Respiratory syncytial virus",
+      "aliases": [],
+      "arabic_name": "الفيروس المخلوي التنفسي",
+      "keywords_en": [
+        "respiratory syncytial virus",
+        "rsv"
+      ],
+      "keywords_ar": [],
+      "priority": "medium",
+      "who_classification": "Auto-discovered"
+    },
+    {
+      "name": "Norovirus",
+      "aliases": [],
+      "arabic_name": "نوروفيروس",
+      "keywords_en": [
+        "norovirus infection",
+        "viral gastroenteritis",
+        "norovirus",
+        "noro virus",
+        "winter vomiting bug",
+        "gastroenteritis",
+        "norwalk virus"
+      ],
+      "keywords_ar": [],
+      "priority": "medium",
+      "who_classification": "Auto-discovered"
+    },
+    {
+      "name": "Crimean-Congo Hemorrhagic Fever",
+      "aliases": [
+        "Congo-Crimean hemorrhagic fever"
+      ],
+      "arabic_name": "حمى القرم-الكونغو النزفية",
+      "keywords_en": [
+        "cchf virus",
+        "congo fever",
+        "cchf",
+        "congo-crimean hemorrhagic fever",
+        "crimean-congo hemorrhagic fever",
+        "cchfv"
+      ],
+      "keywords_ar": [],
+      "priority": "medium",
+      "who_classification": "Auto-discovered"
+    },
+    {
+      "name": "Psittacosis",
+      "aliases": [],
+      "arabic_name": "داء الببغاء",
+      "keywords_en": [
+        "chlamydia psittaci",
+        "psittacosis",
+        "parrot fever"
+      ],
+      "keywords_ar": [],
+      "priority": "medium",
+      "who_classification": "Auto-discovered"
+    },
+    {
+      "name": "New World Screwworm",
+      "aliases": [],
+      "arabic_name": "ذبابة الدودة الحلزونية",
+      "keywords_en": [
+        "new world screwworm",
+        "screwworm",
+        "cochliomyia hominivorax"
+      ],
+      "keywords_ar": [],
+      "priority": "medium",
+      "who_classification": "Auto-discovered"
+    },
+    {
+      "name": "Hantavirus",
+      "aliases": [],
+      "arabic_name": "فيروس هانتا",
+      "keywords_en": [
+        "hantavirus pulmonary syndrome",
+        "hantavirus infection",
+        "hantavirus"
+      ],
+      "keywords_ar": [],
+      "priority": "medium",
+      "who_classification": "Auto-discovered"
+    },
+    {
+      "name": "Dirofilariasis",
+      "aliases": [],
+      "arabic_name": "داء الديدان القلبية",
+      "keywords_en": [
+        "dirofilaria",
+        "dirofilariasis",
+        "canine heartworm",
+        "heartworm disease"
+      ],
+      "keywords_ar": [],
+      "priority": "medium",
+      "who_classification": "Auto-discovered"
+    },
+    {
+      "name": "E. coli",
+      "aliases": [
+        "E. coli EHEC"
+      ],
+      "arabic_name": "الإشريكية القولونية",
+      "keywords_en": [
+        "hemolytic uremic syndrome",
+        "ehec",
+        "hus",
+        "foodborne illness",
+        "e. coli",
+        "e. coli ehec",
+        "escherichia coli"
+      ],
+      "keywords_ar": [],
+      "priority": "medium",
+      "who_classification": "Auto-discovered"
+    },
+    {
+      "name": "Equine Herpesvirus",
+      "aliases": [],
+      "arabic_name": "فيروس هربس الخيول",
+      "keywords_en": [
+        "ehv",
+        "equine herpesvirus",
+        "horse herpesvirus"
+      ],
+      "keywords_ar": [],
+      "priority": "medium",
+      "who_classification": "Auto-discovered"
+    },
+    {
+      "name": "Campylobacter enterocolitis",
+      "aliases": [],
+      "arabic_name": "التهاب الأمعاء العطيفي",
+      "keywords_en": [
+        "campylobacter enterocolitis",
+        "campylobacter",
+        "gastrointestinal infection",
+        "enterocolitis",
+        "campylobacteriosis",
+        "gastroenteritis"
+      ],
+      "keywords_ar": [],
+      "priority": "medium",
+      "who_classification": "Auto-discovered"
+    },
+    {
+      "name": "Salmonella",
+      "aliases": [
+        "Salmonellosis"
+      ],
+      "arabic_name": "السالمونيلا",
+      "keywords_en": [
+        "salmonella",
+        "salmonella infections",
+        "salmonellosis",
+        "foodborne illness",
+        "salmonella infection"
+      ],
+      "keywords_ar": [],
+      "priority": "medium",
+      "who_classification": "Auto-discovered"
+    },
+    {
+      "name": "Infant Botulism",
+      "aliases": [],
+      "arabic_name": "تسمم الرضع الوشيقي",
+      "keywords_en": [
+        "clostridium botulinum",
+        "botulism",
+        "infant disease",
+        "infant botulism"
+      ],
+      "keywords_ar": [],
+      "priority": "medium",
+      "who_classification": "Auto-discovered"
+    },
+    {
+      "name": "Rocky Mountain Spotted Fever",
+      "aliases": [],
+      "arabic_name": "حمى الجبال الصخرية المبقعة",
+      "keywords_en": [
+        "rmsf",
+        "rickettsia rickettsii",
+        "tick-borne illness",
+        "tick-borne disease",
+        "rocky mountain spotted fever"
+      ],
+      "keywords_ar": [],
+      "priority": "medium",
+      "who_classification": "Auto-discovered"
+    },
+    {
+      "name": "Pteropine Orthoreovirus",
+      "aliases": [],
+      "arabic_name": "فيروس أورثوريو الخفافيش",
+      "keywords_en": [
+        "porv",
+        "pteropine orthoreovirus",
+        "bat virus"
+      ],
+      "keywords_ar": [],
+      "priority": "medium",
+      "who_classification": "Auto-discovered"
+    },
+    {
+      "name": "Varicella",
+      "aliases": [],
+      "arabic_name": "الجدري المائي",
+      "keywords_en": [
+        "vzv",
+        "varicella",
+        "chickenpox",
+        "varicella zoster virus"
+      ],
+      "keywords_ar": [],
+      "priority": "medium",
+      "who_classification": "Auto-discovered"
+    },
+    {
+      "name": "Burkholderia stabilis",
+      "aliases": [],
+      "arabic_name": "بكتيريا بوركهولدرية",
+      "keywords_en": [
+        "burkholderia stabilis",
+        "b. stabilis"
+      ],
+      "keywords_ar": [],
+      "priority": "medium",
+      "who_classification": "Auto-discovered"
+    },
+    {
+      "name": "Kyasanur Forest Disease",
+      "aliases": [],
+      "arabic_name": "مرض غابة كيسانور",
+      "keywords_en": [
+        "kyasanur forest disease",
+        "kfd",
+        "tick-borne viral infection",
+        "tick-borne disease"
+      ],
+      "keywords_ar": [],
+      "priority": "medium",
+      "who_classification": "Auto-discovered"
+    },
+    {
+      "name": "Lumpy Skin Disease",
+      "aliases": [],
+      "arabic_name": "مرض الجلد العقدي",
+      "keywords_en": [
+        "lumpy skin disease",
+        "lsd",
+        "cattle disease",
+        "lumpy skin disease virus"
+      ],
+      "keywords_ar": [],
+      "priority": "medium",
+      "who_classification": "Auto-discovered"
+    },
+    {
+      "name": "Shigellosis",
+      "aliases": [],
+      "arabic_name": "داء الشيغيلات",
+      "keywords_en": [
+        "serotype lomalinda",
+        "foodborne illness",
+        "shigellosis",
+        "shigella"
+      ],
+      "keywords_ar": [],
+      "priority": "medium",
+      "who_classification": "Auto-discovered"
+    },
+    {
+      "name": "Listeriosis",
+      "aliases": [],
+      "arabic_name": "الليستيريا",
+      "keywords_en": [
+        "listeria monocytogenes",
+        "listeria",
+        "listeria infection",
+        "listeriosis"
+      ],
+      "keywords_ar": [],
+      "priority": "medium",
+      "who_classification": "Auto-discovered"
+    },
+    {
+      "name": "Mycobacterium abscessus complex",
+      "aliases": [],
+      "arabic_name": "عدوى المتفطرة الخراجية",
+      "keywords_en": [
+        "mycobacterium abscessus complex",
+        "mycobacterium abscessus",
+        "drug resistance",
+        "infection",
+        "rapidly growing mycobacteria",
+        "m abscessus"
+      ],
+      "keywords_ar": [],
+      "priority": "medium",
+      "who_classification": "Auto-discovered"
+    },
+    {
+      "name": "Cutibacterium acnes infection",
+      "aliases": [],
+      "arabic_name": "عدوى الجراثيم البروبيونية",
+      "keywords_en": [
+        "propionibacterium acnes",
+        "cutibacterium acnes infection",
+        "prosthetic joint infection",
+        "cutibacterium acnes",
+        "joint infection"
+      ],
+      "keywords_ar": [],
+      "priority": "medium",
+      "who_classification": "Auto-discovered"
+    },
+    {
+      "name": "Equine Infectious Anemia",
+      "aliases": [],
+      "arabic_name": "فقر الدم المعدي الخيلي",
+      "keywords_en": [
+        "eia",
+        "equine infectious anemia",
+        "eiav"
+      ],
+      "keywords_ar": [],
+      "priority": "medium",
+      "who_classification": "Auto-discovered"
+    },
+    {
+      "name": "Newcastle disease",
+      "aliases": [],
+      "arabic_name": "مرض نيوكاسل",
+      "keywords_en": [
+        "nd",
+        "poultry disease",
+        "avian paramyxovirus",
+        "newcastle disease"
+      ],
+      "keywords_ar": [],
+      "priority": "medium",
+      "who_classification": "Auto-discovered"
+    },
+    {
+      "name": "Legionellosis",
+      "aliases": [
+        "Legionnaires' disease"
+      ],
+      "arabic_name": "داء الفيالقة",
+      "keywords_en": [
+        "legionella longbeachae",
+        "legionella",
+        "legionnaires",
+        "legionellosis",
+        "legionnaires' disease"
+      ],
+      "keywords_ar": [],
+      "priority": "medium",
+      "who_classification": "Auto-discovered"
+    },
+    {
+      "name": "Rhinovirus",
+      "aliases": [],
+      "arabic_name": "الفيروس الأنفي",
+      "keywords_en": [
+        "rhinovirus",
+        "hrv",
+        "common cold"
+      ],
+      "keywords_ar": [],
+      "priority": "medium",
+      "who_classification": "Auto-discovered"
+    },
+    {
+      "name": "Foot and Mouth Disease",
+      "aliases": [],
+      "arabic_name": "مرض الحمى القلاعية",
+      "keywords_en": [
+        "fmd",
+        "foot and mouth disease",
+        "hoof-and-mouth disease"
+      ],
+      "keywords_ar": [],
+      "priority": "medium",
+      "who_classification": "Auto-discovered"
+    },
+    {
+      "name": "Wheat Dwarf Virus",
+      "aliases": [],
+      "arabic_name": "فيروس تقزم القمح",
+      "keywords_en": [
+        "wdv",
+        "wheat dwarf virus"
+      ],
+      "keywords_ar": [],
+      "priority": "medium",
+      "who_classification": "Auto-discovered"
+    },
+    {
+      "name": "Leprosy",
+      "aliases": [],
+      "arabic_name": "الجذام",
+      "keywords_en": [
+        "hansen's disease",
+        "mycobacterium leprae",
+        "leprosy"
+      ],
+      "keywords_ar": [],
+      "priority": "medium",
+      "who_classification": "Auto-discovered"
+    },
+    {
+      "name": "Tick-borne encephalitis",
+      "aliases": [],
+      "arabic_name": "التهاب الدماغ المنقول بالقراد",
+      "keywords_en": [
+        "kleщевой энцефалит",
+        "tbe",
+        "tick-borne encephalitis"
+      ],
+      "keywords_ar": [],
+      "priority": "medium",
+      "who_classification": "Auto-discovered"
+    },
+    {
+      "name": "Tomato Brown Rugose Fruit Virus",
+      "aliases": [],
+      "arabic_name": "فيروس تجعد ثمار الطماطم البني",
+      "keywords_en": [
+        "tobrfv",
+        "tomato brown rugose fruit virus"
+      ],
+      "keywords_ar": [],
+      "priority": "medium",
+      "who_classification": "Auto-discovered"
+    }
+  ],
+  "priority_levels": {
+    "critical": {
+      "description": "Immediate action required - potential pandemic threat",
+      "notification_delay_minutes": 0,
+      "email_urgency": "high"
+    },
+    "high": {
+      "description": "Significant outbreak requiring close monitoring",
+      "notification_delay_minutes": 30,
+      "email_urgency": "medium"
+    },
+    "medium": {
+      "description": "Routine surveillance finding",
+      "notification_delay_minutes": 60,
+      "email_urgency": "normal"
+    },
+    "low": {
+      "description": "Informational only",
+      "notification_delay_minutes": 360,
+      "email_urgency": "low"
+    }
+  }
+}
