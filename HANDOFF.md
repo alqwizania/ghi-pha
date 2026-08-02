@@ -54,6 +54,47 @@ source's `fetch_interval_hours`.
 59 sources registered, **40 collecting**. A full scan yields events from
 ~27 of them.
 
+### Structured extraction (pilot)
+
+Four sources — **ECDC, WHO AFRO, UK UKHSA, WHO EMRO MERS** — are set to
+`parser_hint = 'ai'` and route their content through Claude with a fixed
+extraction schema
+([`event-extractor.ts`](file:///d:/Vibecoding/GHI%20System/backend/src/services/event-extractor.ts)).
+
+This exists because the title scraper cannot tell an outbreak headline from
+page furniture. Measured against ECDC's threats page, **five of the eight
+"events" it recorded were navigation chrome** — "Main Navigation (desktop)",
+"Global Navigation", "Public health topics" — and those became rows in
+`radar_events` and candidate triage signals.
+
+The division of responsibility is deliberate: **the model extracts facts**
+(disease, country, case and death counts, dates), and **risk classification
+stays in deterministic code**. A health authority must be able to explain why
+something was rated Critical, and "the model decided" is not a defensible
+answer.
+
+`htmlToText` strips scripts, styles, and navigation landmarks before the
+content is sent, which cuts a page by 95–97% (ECDC 99KB → 4KB, WHO AFRO 48KB →
+1.4KB). That keeps per-extraction cost small and removes the nav text that
+confused the old extractor at source.
+
+**To enable it:**
+
+```bash
+cd backend
+npx wrangler secret put ANTHROPIC_API_KEY
+```
+
+Locally, add `ANTHROPIC_API_KEY="sk-ant-..."` to `backend/.dev.vars`. Without a
+key these four sources fall back to the legacy extractor rather than failing,
+and the scan banner reports that they ran degraded.
+
+⚠️ **The model call itself has not yet been executed against the live API** —
+no key was available during development. The request shape compiles against the
+Anthropic SDK's own types with no casts, and the fallback path is verified, but
+the first real extraction should be reviewed against what an analyst would have
+recorded before the remaining sources are switched over.
+
 ### Sources awaiting Browser Rendering
 
 Six sources are reachable but return a page whose content is assembled
@@ -315,6 +356,22 @@ cd backend
 node migrations/001_radar_events_unique.mjs           # report only
 node migrations/001_radar_events_unique.mjs --apply   # execute
 ```
+
+**007 — structured extraction pilot (applied 2 Aug 2026).** Switched ECDC, WHO
+AFRO, UK UKHSA, and WHO EMRO MERS to `parser_hint = 'ai'`. Deliberately four
+and not forty — extraction quality has to be measured against what an analyst
+would record before it is trusted across the registry.
+
+**006 — Beacon correction (applied 2 Aug 2026).** Migration 003 had swept
+Beacon Bio up with the legacy entries and labelled it "superseded by the merged
+registry". That was wrong: nothing superseded it, and **148 of the 150 signals
+in the triage queue originated from Beacon**. Its registered URL
+(`beacon.bio/api/feed`) also pointed at an unrelated company's domain. The real
+site serves a shell whose Next.js payload carries only UI strings — the event
+list loads client-side — and its API paths return 403 to plain requests, which
+is why the old Jina-proxy collector matched zero events on every run. Beacon is
+now registered against `beaconbio.org` as a `browser` source and is the
+**highest-value Browser Rendering candidate**.
 
 **005 — CDC egress workaround (applied 2 Aug 2026).** `www.cdc.gov` returns
 HTTP 403 to Cloudflare Workers egress — verified with and without a browser

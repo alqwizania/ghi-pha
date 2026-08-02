@@ -1,5 +1,6 @@
 import { surveillanceSources, sourceSnapshots, radarEvents, signals } from '../db/schema';
 import { eq, gte } from 'drizzle-orm';
+import { extractEvents } from './event-extractor';
 
 // ============================================================
 // COUNTRY GEOCODING LOOKUP (150+ countries → lat/lng)
@@ -681,8 +682,72 @@ export async function initializeSources(db: any) {
 // ============================================================
 // PARSER DISPATCH
 // ============================================================
-function parseSource(source: RegisteredSource, body: string): SourceResult {
+/**
+ * Structured extraction via Claude, for sources whose page layout defeats the
+ * naive title scraper. Falls back to that scraper when no API key is set, so a
+ * missing key degrades quality rather than breaking the scan.
+ */
+async function parseWithModel(
+  source: RegisteredSource,
+  body: string,
+  apiKey: string | undefined
+): Promise<SourceResult> {
+  const isHtml = source.fetchStrategy !== 'json';
+  const outcome = await extractEvents(apiKey, source, body, isHtml);
+
+  if (outcome.status === 'no_key') {
+    const fallback = parseHTMLTitles(source.id, source.name, source.url, body);
+    return { ...fallback, detail: `${fallback.detail} (model extraction unavailable: no API key)` };
+  }
+  if (outcome.status === 'refusal' || outcome.status === 'error') {
+    return failed(source.id, 'parse_error', outcome.detail);
+  }
+
+  const cutoff = cutoffDate();
+  const today = new Date().toISOString().substring(0, 10);
+  const events: ParsedEvent[] = [];
+
+  for (const e of outcome.events) {
+    const dateReported = e.dateReported || today;
+    if (dateReported < cutoff) continue;
+
+    const country = e.country || 'Global';
+    const coords = geoLookup(country);
+    const cases = e.cases ?? 0;
+    const deaths = e.deaths ?? 0;
+
+    events.push({
+      sourceId: source.id,
+      sourceName: source.name,
+      title: (e.title || '').substring(0, 300),
+      disease: e.disease || 'Unspecified',
+      country,
+      lat: String(coords.lat),
+      lng: String(coords.lng),
+      dateReported,
+      cases,
+      deaths,
+      cfr: cases > 0 ? ((deaths / cases) * 100).toFixed(2) : '0.00',
+      summary: (e.summary || '').substring(0, 400),
+      sourceUrl: e.url || source.url,
+      boardType: 'biological',
+      // Severity stays in deterministic code so an escalation can be explained
+      // without appealing to the model's judgement.
+      riskLevel: classifyRisk(`${e.title} ${e.summary}`, cases, deaths),
+    });
+  }
+
+  return ok(source.id, events, outcome.events.length);
+}
+
+async function parseSource(
+  source: RegisteredSource,
+  body: string,
+  apiKey: string | undefined
+): Promise<SourceResult> {
   switch (source.parserHint) {
+    case 'ai':
+      return parseWithModel(source, body, apiKey);
     case 'who_dons':
       return parseWHO_DONs(body);
     case 'who_mpox':
@@ -822,7 +887,7 @@ export async function fetchGlobalRadarScan(db?: any, env?: any, options: { force
       };
     }
 
-    return { spec, fetchedAt, changed: true, hash, bytes: retrieved.body.length, result: parseSource(spec, retrieved.body) };
+    return { spec, fetchedAt, changed: true, hash, bytes: retrieved.body.length, result: await parseSource(spec, retrieved.body, env?.ANTHROPIC_API_KEY) };
   });
 
   for (const outcome of outcomes) {
@@ -958,6 +1023,18 @@ export async function fetchGlobalRadarScan(db?: any, env?: any, options: { force
     }
   }
 
+  // Sources configured for structured extraction silently fall back to the
+  // legacy title scraper when no key is present. That is a quality difference
+  // the operator should see, not a silent downgrade.
+  const wantsModel = due.filter((s: any) => s.parserHint === 'ai').map((s: any) => s.id);
+  const extraction = !env?.ANTHROPIC_API_KEY && wantsModel.length > 0
+    ? {
+        mode: 'fallback' as const,
+        detail: 'ANTHROPIC_API_KEY is not configured; these sources used the legacy title extractor',
+        affected: wantsModel,
+      }
+    : { mode: wantsModel.length > 0 ? ('structured' as const) : ('legacy' as const), detail: '', affected: wantsModel };
+
   return {
     status: degraded.length > 0 ? 'degraded' : 'success',
     count: allEvents.length,
@@ -969,6 +1046,7 @@ export async function fetchGlobalRadarScan(db?: any, env?: any, options: { force
     sources: sourceStats,
     degraded,
     diagnostics,
+    extraction,
   };
 }
 

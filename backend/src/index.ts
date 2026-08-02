@@ -12,6 +12,9 @@ type Bindings = {
     // Fallback Postgres connection string. Set as a Worker secret in
     // production (`wrangler secret put DATABASE_URL`) and in .dev.vars locally.
     DATABASE_URL?: string;
+    // Enables structured extraction. Without it the collector falls back to the
+    // legacy title scraper rather than failing.
+    ANTHROPIC_API_KEY?: string;
 };
 
 type SessionUser = {

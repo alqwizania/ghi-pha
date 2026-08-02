@@ -55,6 +55,9 @@ interface ScanResult {
   sources?: Record<string, number>;
   degraded: string[];
   diagnostics: Record<string, string>;
+  // 'fallback' means sources configured for structured extraction ran on the
+  // legacy title scraper instead — a quality downgrade worth showing.
+  extraction?: { mode: 'structured' | 'fallback' | 'legacy'; detail: string; affected: string[] };
 }
 
 interface RadarSource {
@@ -498,8 +501,15 @@ export default function GlobalRadarView({ onPromoteToTriage }: GlobalRadarViewPr
                   {scanResult.degraded.join(', ')}
                 </p>
               )}
-              {scanResult.status === 'success' && (
+              {scanResult.status === 'success' && scanResult.degraded.length === 0 && (
                 <p className="mt-1 text-[10px] text-slate-400">All sources responding.</p>
+              )}
+              {scanResult.extraction?.mode === 'fallback' && (
+                <p className="mt-1 text-[10px] leading-snug text-ghi-warning">
+                  {scanResult.extraction.affected.length} source
+                  {scanResult.extraction.affected.length === 1 ? '' : 's'} used the basic extractor —
+                  structured extraction is not configured.
+                </p>
               )}
             </div>
             <button
