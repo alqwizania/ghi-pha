@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, varchar, timestamp, date, integer, numeric, boolean, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, varchar, timestamp, date, integer, numeric, smallint, boolean, jsonb } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
 export const signals = pgTable("signals", {
@@ -34,6 +34,11 @@ export const signals = pgTable("signals", {
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
     lastBeaconSync: timestamp("last_beacon_sync", { withTimezone: true }),
+    // Which stream produced this signal, and — for radar signals — the event
+    // and whether scoring promoted it automatically. Added by migration 011.
+    sourceStream: varchar("source_stream", { length: 20 }).default("radar").notNull(),
+    radarEventId: uuid("radar_event_id"),
+    autoPromoted: boolean("auto_promoted").default(false).notNull(),
 });
 
 export const assessments = pgTable("assessments", {
@@ -153,6 +158,56 @@ export const radarEvents = pgTable("radar_events", {
     // Never written by the application; declared here so drizzle-kit does not
     // treat the column as drift.
     contentHash: text("content_hash"),
+});
+
+// What "expected" looks like per disease per country. A NULL country is the
+// global default; a country row overrides it. See migration 012.
+export const diseaseBaselines = pgTable("disease_baselines", {
+    id: uuid("id").primaryKey().defaultRandom(),
+    disease: varchar("disease", { length: 120 }).notNull(),
+    country: varchar("country", { length: 100 }),
+    endemicStatus: varchar("endemic_status", { length: 20 }).default("absent").notNull(),
+    expectedAnnualCases: integer("expected_annual_cases"),
+    baselineCfr: numeric("baseline_cfr", { precision: 5, scale: 2 }),
+    transmissionRoute: varchar("transmission_route", { length: 40 }),
+    ihrNotifiable: boolean("ihr_notifiable").default(false).notNull(),
+    ihrAssessAlways: boolean("ihr_assess_always").default(false).notNull(),
+    notes: text("notes"),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// Five IHR-derived domain scores per event, with the evidence behind each.
+// Storing only a total would make escalations unauditable.
+export const eventScores = pgTable("event_scores", {
+    radarEventId: uuid("radar_event_id").primaryKey()
+        .references(() => radarEvents.id, { onDelete: "cascade" }),
+    severity: smallint("severity").default(0).notNull(),
+    unusualness: smallint("unusualness").default(0).notNull(),
+    spread: smallint("spread").default(0).notNull(),
+    tradeTravel: smallint("trade_travel").default(0).notNull(),
+    ksaRelevance: smallint("ksa_relevance").default(0).notNull(),
+    domainsAtTwo: smallint("domains_at_two").default(0).notNull(),
+    tier: varchar("tier", { length: 12 }).default("routine").notNull(),
+    mandatoryIhr: boolean("mandatory_ihr").default(false).notNull(),
+    confidence: varchar("confidence", { length: 10 }).default("medium").notNull(),
+    evidence: jsonb("evidence").default({}).notNull(),
+    reportsOccurrence: boolean("reports_occurrence").default(true).notNull(),
+    scorerVersion: varchar("scorer_version", { length: 20 }).notNull(),
+    scoredAt: timestamp("scored_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// Corroboration between signals across streams. An official source confirming
+// a social one raises confidence, not severity.
+export const signalLinks = pgTable("signal_links", {
+    id: uuid("id").primaryKey().defaultRandom(),
+    fromType: varchar("from_type", { length: 20 }).notNull(),
+    fromId: uuid("from_id").notNull(),
+    toType: varchar("to_type", { length: 20 }).notNull(),
+    toId: uuid("to_id").notNull(),
+    linkType: varchar("link_type", { length: 20 }).notNull(),
+    confidence: numeric("confidence", { precision: 3, scale: 2 }),
+    rationale: text("rationale"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export const users = pgTable("users", {

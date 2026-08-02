@@ -510,7 +510,51 @@ app.get('/api/radar/sources', async (c) => {
     }
 });
 
+// Events are returned with their priority score, and filtered by default to
+// items describing an actual disease occurrence. Vaccination campaigns,
+// preparedness features and funding announcements are recorded but are not
+// things to act on, and they drowned the real signals. `?all=1` returns
+// everything for an analyst who wants the full picture.
 app.get('/api/radar/events', async (c) => {
+    try {
+        const dbClient = getDB(c.env);
+        const includeAll = c.req.query('all') === '1';
+
+        const rows = await dbClient
+            .select()
+            .from(schema.radarEvents)
+            .leftJoin(schema.eventScores, eq(schema.eventScores.radarEventId, schema.radarEvents.id))
+            .where(gte(schema.radarEvents.dateReported, cutoffDate()))
+            .orderBy(desc(schema.radarEvents.createdAt));
+
+        const enriched = rows
+            .filter((r: any) => includeAll || r.event_scores?.reportsOccurrence !== false)
+            .map((r: any) => ({
+                ...r.radar_events,
+                score: r.event_scores
+                    ? {
+                        tier: r.event_scores.tier,
+                        domainsAtTwo: r.event_scores.domainsAtTwo,
+                        severity: r.event_scores.severity,
+                        unusualness: r.event_scores.unusualness,
+                        spread: r.event_scores.spread,
+                        tradeTravel: r.event_scores.tradeTravel,
+                        ksaRelevance: r.event_scores.ksaRelevance,
+                        mandatoryIhr: r.event_scores.mandatoryIhr,
+                        confidence: r.event_scores.confidence,
+                        reportsOccurrence: r.event_scores.reportsOccurrence,
+                        evidence: r.event_scores.evidence,
+                    }
+                    : null,
+            }));
+
+        return c.json(enriched);
+    } catch {
+        return c.json([]);
+    }
+});
+
+app.get('/api/radar/events-legacy', async (c) => {
     try {
         const dbClient = getDB(c.env);
         const result = await dbClient.query.radarEvents.findMany({

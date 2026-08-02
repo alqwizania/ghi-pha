@@ -310,6 +310,45 @@ npx wrangler pages deploy dist --project-name=ghi-pha
 
 ---
 
+## ▶️ Where to pick up next
+
+In priority order, with reasoning:
+
+1. **Browser Rendering** — unblocks **7 sources**, including **Beacon Bio**,
+   which historically supplied 148 of 150 triage signals. Needs
+   `@cloudflare/puppeteer`, a `[browser]` binding in `wrangler.toml`, and
+   Browser Rendering enabled on the account. Dispatch point is
+   `retrieveSource()` in `radar-collector.ts` — the code path exists and
+   currently returns a clear "not configured" diagnostic.
+
+2. **Automated assessment (was Phase 4)** — add `machine_draft` JSONB plus
+   `machine_model` / `machine_generated_at` / `machine_confidence` to
+   `assessments`. On accept, high-tier signals get an auto-generated IHR Annex 2
+   answer set and RRA draft written to **both** the frozen draft and the live
+   fields. Analyst edits change only the live fields, so any divergence *is* the
+   human override with no extra flags. Scoring already supplies the IHR domain
+   answers, so the draft is largely a mapping exercise.
+
+3. **Queue split** — a forced full scan takes ~5 minutes in one request.
+   Fetch queue + extract queue makes each source an independent message.
+
+4. **Listener ingestion** — currently 8 mock rows (`post_id` = `mock_1`…`mock_8`).
+   Build against **Bluesky, Telegram and regional news RSS** first: free, open
+   APIs, no ToS risk. X's Basic tier (~$200/month) behind an adapter if
+   procurement approves. **Do not scrape X with a logged-in account** — it
+   violates their ToS and creates real institutional exposure for a government
+   authority. The 12 monitored accounts and 32 keywords are real config worth
+   keeping.
+
+5. **Hajj/Umrah windows** — set `MASS_GATHERING_WINDOWS` annually.
+
+### Known false positives worth a prompt tweak
+
+A Czech hospital-preparedness feature was recorded as an Ebola event in
+Czechia; UKHSA "Yellow heat health alerts" is captured with disease
+"Unspecified"; a long-COVID research analysis passes the occurrence filter.
+Whether heat alerts belong in triage is a domain call, not a technical one.
+
 ## 🟢 Current State & Readiness
 
 - **Frontend Compilation:** `npm run build` $\rightarrow$ **0 errors**
@@ -322,6 +361,107 @@ npx wrangler pages deploy dist --project-name=ghi-pha
   `/api/radar/sources` and the live scan diagnostics. It shows four states —
   Live, No new items, Unavailable, Not yet scanned — instead of the previous
   hardcoded all-green list.
+
+## 🎯 Priority Scoring & Auto-Promotion (Phase 3 — done)
+
+Every radar event is scored on five domains and anything clearing the threshold
+is promoted into triage **automatically**. This closed the gap where an event
+only reached an analyst if someone spotted it on a map and pressed a button —
+which had happened twice in the system's history.
+
+Implementation:
+[`signal-scoring.ts`](file:///d:/Vibecoding/GHI%20System/backend/src/services/signal-scoring.ts).
+
+### The method (not a hunch)
+
+Four domains map directly onto **IHR (2005) Annex 2**, so a high triage score
+predicts the IHR outcome analysts reach downstream rather than being a separate
+opinion. The fifth is the WHO RRA context leg, specialised for the Kingdom.
+
+| Domain | IHR question | Scored 0–3 on |
+|---|---|---|
+| Severity | Q1 — impact serious? | CFR vs disease baseline, deaths, cases vs expected annual, health-system strain |
+| Unusualness | Q2 — unusual/unexpected? | Novel pathogen, outside known range, atypical presentation, endemic status |
+| Spread | Q3 — international spread? | Human-to-human, **healthcare-worker infections**, multi-country, transmission route |
+| Trade & travel | Q4 — restrictions? | Advisories, border measures, restriction language |
+| KSA relevance | RRA context | Border/GCC, pilgrim corridors, mass-gathering window, endemic status |
+
+**Founding principle: anomaly is deviation from expectation, not magnitude.**
+Forty cholera cases in Yemen mid-epidemic is background; four in Riyadh is an
+emergency. Severity is judged against `disease_baselines`, never raw counts.
+
+**The escalation rule comes from IHR, not from us.** Annex 2 requires
+notification when *any two of the four* questions are yes, so a signal is high
+priority at **two or more domains scoring ≥2**. KSA relevance is a one-tier
+modifier — it can raise a signal, never escalate one alone.
+
+**Mandatory overrides:** Annex 2 always-notifiable diseases (smallpox, wild
+poliovirus, novel influenza subtypes, SARS) bypass scoring — *but only when the
+item reports an actual occurrence*. Without that guard a polio vaccination
+campaign escalated as critical.
+
+**Confidence is a separate axis** and gates automation, never severity. Low-confidence
+sources are never auto-promoted; WHO's EBS process puts verification before risk
+assessment, and collapsing the two is how a system escalates a rumour.
+
+**Sub-scores are stored, not just totals.** `event_scores.evidence` holds the
+reasons behind each domain so an analyst can see *why* something scored high
+and challenge it.
+
+### Auto-promotion and corroboration
+
+Events at `critical`/`high` tier with adequate confidence become triage signals
+automatically. WHO, ECDC and CIDRAP all report the same outbreak, so before
+creating a signal the collector looks for an open signal with the same disease
+and country in the window — if one exists it records a **corroboration link**
+instead. Independent agreement raises confidence; it is not a second outbreak.
+
+Current state: **112 events scored, 3 critical, 4 high, 7 auto-promoted**,
+including MERS-CoV Saudi Arabia (2,226 cases / 869 deaths, CFR above baseline)
+and WPV1 Pakistan.
+
+### ⚠️ `MASS_GATHERING_WINDOWS` is deliberately empty
+
+Hajj moves ~11 days earlier each Gregorian year and encoding a guessed date
+would be worse than encoding none. **PHA must set the Hajj and Umrah windows
+annually** in `signal-scoring.ts`; until then that modifier never fires.
+
+### Noise filter
+
+`reportsOccurrence` separates a disease *actually happening* from vaccination
+campaigns, preparedness features, funding news and product recalls with no
+confirmed illness. `/api/radar/events` returns only actionable items by
+default; `?all=1` returns everything.
+
+The filter is on **occurrence, not case counts** — 220 of 234 events carried no
+count, and among them were "measles outbreak in Delaware" and an Ebola
+escalation. The first report of an outbreak almost never has a number, and that
+is exactly the signal worth having. Currently 53 actionable of 111 total.
+
+## 📊 Dashboard
+
+The "GCC & Regional Border Threat Level" panel was a **hardcoded array** —
+Yemen/Cholera/420 and three siblings that never changed. It now queries scored
+radar events for GCC and bordering states, ordered by tier.
+
+Also replaced: the fabricated "96.4% SLA compliance" figure, the "+12% from
+previous week" trend, and "Priority Score > 85" (which read 0 because nothing
+computed a score). All now show real values or are gone.
+
+Added: the **assessed-signals line listing** — disease, country, cases, CFR,
+IHR decision, RRA risk, and whether a human reviewed it or it is still
+machine-only.
+
+### Design decision: escalation is not a separate view
+
+Escalations appear as a **red band on the Dashboard**, shown only when one is
+open, plus status in the line listing. There is deliberately no Escalations tab.
+
+Escalations are rare and urgent. A tab hides rare things until someone thinks to
+look, which is the opposite of what an escalation is for; an unmissable band on
+the view executives already open interrupts appropriately. The `escalations`
+table and the escalate action in AssessmentView are unchanged — this is about
+where the state is *surfaced*, not how it is recorded.
 
 ## 🔐 Authentication
 
@@ -380,6 +520,27 @@ cd backend
 node migrations/001_radar_events_unique.mjs           # report only
 node migrations/001_radar_events_unique.mjs --apply   # execute
 ```
+
+**013 — actionability filter (applied 2 Aug 2026).** Purged 122 legacy
+naive-extractor rows (identifiable by their "Headline detected from …"
+summary), added `event_scores.reports_occurrence`, and cleared scores for
+recompute.
+
+**012 — disease baselines (applied 2 Aug 2026).** Seeded 45 baseline rows:
+endemic status, expected annual cases, baseline CFR, transmission route, and
+IHR Annex 2 obligations per disease and country. Indicative starting values
+meant to be corrected by PHA epidemiologists — **this table is curation work
+and is the highest-value dataset in the system.**
+
+**011 — scoring schema (applied 2 Aug 2026).** Created `disease_baselines`,
+`event_scores`, `signal_links`; added `source_stream`, `radar_event_id` and
+`auto_promoted` to `signals`.
+
+**010 — purge scraper artifacts (applied 2 Aug 2026).** Removed 21 navigation
+rows written as surveillance events.
+
+**009 / 008 — extraction rollout (applied 2 Aug 2026).** Switched 12 RSS and 16
+HTML sources to structured extraction.
 
 **007 — structured extraction pilot (applied 2 Aug 2026).** Switched ECDC, WHO
 AFRO, UK UKHSA, and WHO EMRO MERS to `parser_hint = 'ai'`. Deliberately four

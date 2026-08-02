@@ -1,5 +1,6 @@
-import { surveillanceSources, sourceSnapshots, radarEvents, signals } from '../db/schema';
-import { eq, gte } from 'drizzle-orm';
+import { surveillanceSources, sourceSnapshots, radarEvents, signals, eventScores, signalLinks } from '../db/schema';
+import { scoreEvent, shouldAutoPromote, SCORER_VERSION, type DiseaseBaseline, type EpiIndicators, type ScoreResult } from './signal-scoring';
+import { eq, and, gte, isNull } from 'drizzle-orm';
 import { extractEvents } from './event-extractor';
 
 // ============================================================
@@ -382,6 +383,8 @@ interface ParsedEvent {
   sourceUrl: string;
   boardType: string;
   riskLevel: string;
+  /** Present only for model-extracted events; feeds deterministic scoring. */
+  indicators?: EpiIndicators;
 }
 
 // ============================================================
@@ -734,6 +737,7 @@ async function parseWithModel(
       // Severity stays in deterministic code so an escalation can be explained
       // without appealing to the model's judgement.
       riskLevel: classifyRisk(`${e.title} ${e.summary}`, cases, deaths),
+      indicators: e.indicators,
     });
   }
 
@@ -982,6 +986,21 @@ export async function fetchGlobalRadarScan(db?: any, env?: any, options: { force
     skippedCount = skipped;
   }
 
+  // Score everything unscored and promote what clears the IHR threshold.
+  // Runs after insertion so newly written events are picked up in the same
+  // pass, and covers any backlog left by an earlier failure.
+  let scoredCount = 0;
+  let promotedCount = 0;
+  if (db) {
+    try {
+      const result = await scoreAndPromotePending(db);
+      scoredCount = result.scored;
+      promotedCount = result.promoted;
+    } catch (err) {
+      console.error('[GHI Radar] Scoring pass failed:', err);
+    }
+  }
+
   // Record what happened to each source. This is both the change-detection
   // state for the next scan and the health data the sources drawer reads, so
   // it survives beyond the lifetime of a single scan response.
@@ -1047,7 +1066,236 @@ export async function fetchGlobalRadarScan(db?: any, env?: any, options: { force
     degraded,
     diagnostics,
     extraction,
+    scored: scoredCount,
+    promoted: promotedCount,
   };
+}
+
+// ============================================================
+// SCORING + AUTO-PROMOTION
+// ============================================================
+/**
+ * Scores every radar event that has no score yet and promotes the ones
+ * clearing the IHR two-domain rule into the triage queue.
+ *
+ * Promotion is what closes the gap between the radar and triage: previously an
+ * event only reached an analyst if someone spotted it on a map and pressed a
+ * button, which happened twice in the system's history.
+ */
+export async function scoreAndPromotePending(
+  db: any,
+  limit = 400
+): Promise<{ scored: number; promoted: number; corroborated: number }> {
+  const cutoff = cutoffDate();
+  const baselineRows = await db.query.diseaseBaselines.findMany();
+  const baselines: DiseaseBaseline[] = baselineRows.map((b: any) => ({
+    disease: b.disease,
+    country: b.country,
+    endemicStatus: b.endemicStatus,
+    expectedAnnualCases: b.expectedAnnualCases,
+    baselineCfr: b.baselineCfr === null ? null : Number(b.baselineCfr),
+    transmissionRoute: b.transmissionRoute,
+    ihrNotifiable: b.ihrNotifiable,
+    ihrAssessAlways: b.ihrAssessAlways,
+  }));
+
+  const pending = await db
+    .select()
+    .from(radarEvents)
+    .leftJoin(eventScores, eq(eventScores.radarEventId, radarEvents.id))
+    .where(isNull(eventScores.radarEventId))
+    .limit(limit);
+
+  let scored = 0;
+  let corroborated = 0;
+  let promoted = 0;
+
+  for (const row of pending) {
+    const evt = row.radar_events ?? row;
+    try {
+      const result = scoreEvent(
+        {
+          disease: evt.disease,
+          country: evt.country,
+          cases: evt.cases,
+          deaths: evt.deaths,
+          title: evt.title,
+          summary: evt.summary ?? '',
+          dateReported: evt.dateReported,
+          sourceId: evt.sourceId ?? '',
+        },
+        baselines
+      );
+
+      await db.insert(eventScores).values({
+        radarEventId: evt.id,
+        severity: result.severity.score,
+        unusualness: result.unusualness.score,
+        spread: result.spread.score,
+        tradeTravel: result.tradeTravel.score,
+        ksaRelevance: result.ksaRelevance.score,
+        domainsAtTwo: result.domainsAtTwo,
+        tier: result.tier,
+        mandatoryIhr: result.mandatoryIhr,
+        confidence: result.confidence,
+        reportsOccurrence: result.reportsOccurrence,
+        evidence: {
+          severity: result.severity.reasons,
+          unusualness: result.unusualness.reasons,
+          spread: result.spread.reasons,
+          tradeTravel: result.tradeTravel.reasons,
+          ksaRelevance: result.ksaRelevance.reasons,
+        },
+        scorerVersion: SCORER_VERSION,
+      }).onConflictDoNothing();
+      scored++;
+
+      if (shouldAutoPromote(result)) {
+        promoted += await promoteScoredEvent(db, evt, result, cutoff);
+      }
+    } catch (err) {
+      console.error(`[GHI Scoring] Failed on event ${evt.id}:`, err);
+    }
+  }
+
+  // Promotion is a separate pass over everything already scored but not yet in
+  // triage. Scoring and promotion can fail independently — without this an
+  // event that scored during a run that then failed would never reach an
+  // analyst, and a backfill that only writes scores would strand its results.
+  try {
+    const stranded = await db
+      .select()
+      .from(eventScores)
+      .innerJoin(radarEvents, eq(radarEvents.id, eventScores.radarEventId))
+      .where(and(
+        eq(radarEvents.isPromoted, false),
+        gte(radarEvents.dateReported, cutoff)
+      ))
+      .limit(limit);
+
+    for (const row of stranded) {
+      const evt = row.radar_events;
+      const s = row.event_scores;
+      if (!(s.mandatoryIhr || s.tier === 'critical' || s.tier === 'high') || s.confidence === 'low') continue;
+
+      const evidence = (s.evidence ?? {}) as Record<string, string[]>;
+      promoted += await promoteScoredEvent(
+        db,
+        evt,
+        {
+          severity: { score: s.severity as 0 | 1 | 2 | 3, reasons: evidence.severity ?? [] },
+          unusualness: { score: s.unusualness as 0 | 1 | 2 | 3, reasons: evidence.unusualness ?? [] },
+          spread: { score: s.spread as 0 | 1 | 2 | 3, reasons: evidence.spread ?? [] },
+          tradeTravel: { score: s.tradeTravel as 0 | 1 | 2 | 3, reasons: evidence.tradeTravel ?? [] },
+          ksaRelevance: { score: s.ksaRelevance as 0 | 1 | 2 | 3, reasons: evidence.ksaRelevance ?? [] },
+          domainsAtTwo: s.domainsAtTwo,
+          tier: s.tier as ScoreResult['tier'],
+          mandatoryIhr: s.mandatoryIhr,
+          confidence: s.confidence as ScoreResult['confidence'],
+          reportsOccurrence: s.reportsOccurrence,
+        },
+        cutoff
+      );
+    }
+  } catch (err) {
+    console.error('[GHI Scoring] Promotion pass failed:', err);
+  }
+
+  if (scored > 0 || promoted > 0 || corroborated > 0) {
+    console.log(`[GHI Scoring] scored ${scored}, promoted ${promoted}, corroborated ${corroborated} into existing signals`);
+  }
+  return { scored, promoted, corroborated };
+
+  /** Creates a triage signal, or records corroboration against an existing one. */
+  async function promoteScoredEvent(db: any, evt: any, result: ScoreResult, cutoff: string): Promise<number> {
+    try {
+        // WHO, ECDC and CIDRAP all report the same outbreak, so promoting per
+        // event would put one outbreak into triage three times. An existing
+        // open signal for the same disease and country within the window is
+        // the same event: record corroboration against it instead. Independent
+        // agreement raises confidence, it is not a second outbreak.
+        const [existing] = await db
+          .select({ id: signals.id })
+          .from(signals)
+          .where(and(
+            eq(signals.disease, evt.disease),
+            eq(signals.country, evt.country),
+            eq(signals.triageStatus, 'Pending Triage'),
+            gte(signals.dateReported, cutoff)
+          ))
+          .limit(1);
+
+        if (existing) {
+          await db.insert(signalLinks).values({
+            fromType: 'radar_event',
+            fromId: evt.id,
+            toType: 'signal',
+            toId: existing.id,
+            linkType: 'corroborates',
+            confidence: '0.80',
+            rationale: `${evt.sourceName} reports the same ${evt.disease} event in ${evt.country}`,
+          }).onConflictDoNothing();
+
+          await db.update(radarEvents)
+            .set({ isPromoted: true, promotedSignalId: existing.id })
+            .where(eq(radarEvents.id, evt.id));
+          corroborated++;
+          return 0;
+        }
+
+        const [signal] = await db.insert(signals).values({
+          disease: evt.disease,
+          country: evt.country,
+          location: evt.country,
+          dateReported: evt.dateReported,
+          cases: evt.cases ?? 0,
+          deaths: evt.deaths ?? 0,
+          caseFatalityRate: evt.cfr,
+          description: evt.summary,
+          sourceUrl: evt.sourceUrl,
+          sourceName: evt.sourceName,
+          sourceOrigin: 'radar',
+          boardType: evt.boardType ?? 'biological',
+          gccRelevant: result.ksaRelevance.score >= 2,
+          saudiRiskLevel: result.tier === 'critical' ? 'Critical' : result.tier === 'high' ? 'High' : 'Moderate',
+          // The score and its evidence travel with the signal, so triage can
+          // show why an item arrived without recomputing anything.
+          rawData: {
+            radarEventId: evt.id,
+            score: {
+              tier: result.tier,
+              domainsAtTwo: result.domainsAtTwo,
+              mandatoryIhr: result.mandatoryIhr,
+              severity: result.severity,
+              unusualness: result.unusualness,
+              spread: result.spread,
+              tradeTravel: result.tradeTravel,
+              ksaRelevance: result.ksaRelevance,
+            },
+          },
+          priorityScore: Math.round(
+            ((result.severity.score + result.unusualness.score + result.spread.score +
+              result.tradeTravel.score + result.ksaRelevance.score) / 15) * 100
+          ),
+          triageStatus: 'Pending Triage',
+          currentStatus: 'Awaiting Triage',
+          sourceStream: 'radar',
+          radarEventId: evt.id,
+          autoPromoted: true,
+        }).returning();
+
+        if (signal) {
+          await db.update(radarEvents)
+            .set({ isPromoted: true, promotedSignalId: signal.id })
+            .where(eq(radarEvents.id, evt.id));
+          return 1;
+        }
+        return 0;
+    } catch (err) {
+      console.error(`[GHI Scoring] Promotion failed for event ${evt.id}:`, err);
+      return 0;
+    }
+  }
 }
 
 // ============================================================

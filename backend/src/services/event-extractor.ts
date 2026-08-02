@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import type { EpiIndicators } from './signal-scoring';
 
 /**
  * Structured extraction of outbreak events from raw source content.
@@ -24,6 +25,7 @@ export interface ExtractedEvent {
     summary: string;
     url: string | null;
     isOutbreakEvent: boolean;
+    indicators?: EpiIndicators;
 }
 
 export interface ExtractionOutcome {
@@ -81,8 +83,31 @@ const EXTRACTION_SCHEMA = {
                         description:
                             'True only for a specific disease event, outbreak, alert, or surveillance report. False for navigation, cookie notices, generic policy pages, job postings, event announcements, or anything that is not a health event.',
                     },
+                    indicators: {
+                        type: 'object',
+                        description:
+                            'Epidemiological indicators, each true ONLY if the source text explicitly states it. These feed a deterministic risk score, so a false positive here inflates a real escalation — when in doubt, say false.',
+                        properties: {
+                            novelPathogen: { type: 'boolean', description: 'A new pathogen, new subtype, or previously unknown agent.' },
+                            outsideKnownRange: { type: 'boolean', description: 'The disease is occurring outside its established geographic range.' },
+                            unusualPresentation: { type: 'boolean', description: 'Atypical clinical presentation, unusual severity, or unexpected season.' },
+                            humanToHuman: { type: 'boolean', description: 'Human-to-human transmission is reported, suspected, or sustained.' },
+                            healthcareWorkerInfections: { type: 'boolean', description: 'Healthcare workers among the cases.' },
+                            multiCountry: { type: 'boolean', description: 'Cases reported in more than one country.' },
+                            travelRestrictions: { type: 'boolean', description: 'Travel advisories, border measures, or trade restrictions announced or advised.' },
+                            healthSystemStrain: { type: 'boolean', description: 'Hospitals or health services described as overwhelmed or strained.' },
+                            vulnerableGroups: { type: 'boolean', description: 'Children, pregnant women, elderly, immunocompromised, refugees or displaced people specifically affected.' },
+                            antimicrobialResistance: { type: 'boolean', description: 'A new or notable antimicrobial resistance profile.' },
+                        },
+                        required: [
+                            'novelPathogen', 'outsideKnownRange', 'unusualPresentation', 'humanToHuman',
+                            'healthcareWorkerInfections', 'multiCountry', 'travelRestrictions',
+                            'healthSystemStrain', 'vulnerableGroups', 'antimicrobialResistance',
+                        ],
+                        additionalProperties: false,
+                    },
                 },
-                required: ['title', 'disease', 'country', 'dateReported', 'cases', 'deaths', 'summary', 'url', 'isOutbreakEvent'],
+                required: ['title', 'disease', 'country', 'dateReported', 'cases', 'deaths', 'summary', 'url', 'isOutbreakEvent', 'indicators'],
                 additionalProperties: false,
             },
         },
