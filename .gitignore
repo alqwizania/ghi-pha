@@ -14,8 +14,10 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+# Anchored to the repo root: unanchored `lib/` also matched
+# frontend/src/lib/, which silently kept the API client out of the repository.
+/lib/
+/lib64/
 parts/
 sdist/
 var/

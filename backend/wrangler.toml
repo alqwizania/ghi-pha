@@ -3,8 +3,11 @@ main = "src/index.ts"
 compatibility_date = "2024-04-01"
 compatibility_flags = ["nodejs_compat"]
 
-[vars]
-JWT_SECRET = "change-me-later"
+# JWT_SECRET and DATABASE_URL are Worker secrets, not vars — this file is
+# committed. Set them with:
+#   npx wrangler secret put JWT_SECRET
+#   npx wrangler secret put DATABASE_URL
+# Locally they come from backend/.dev.vars (gitignored).
 
 [[hyperdrive]]
 binding = "HYPERDRIVE"

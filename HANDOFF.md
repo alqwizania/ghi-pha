@@ -219,6 +219,42 @@ npx wrangler pages deploy dist --project-name=ghi-pha
   Live, No new items, Unavailable, Not yet scanned — instead of the previous
   hardcoded all-green list.
 
+## 🔐 Authentication
+
+Every endpoint except the list below requires a `Authorization: Bearer <jwt>`
+header. Tokens are issued by `/api/v1/auth/login`, signed HS256, and expire
+after 24 hours. The frontend attaches the token automatically via
+`frontend/src/lib/api.ts`; a `401` clears the stored session and returns the
+operator to the login screen.
+
+**Public endpoints:** `/`, `/health`, `/api/v1/ping`, `/api/v1/auth/login`,
+and the RSS feed (`/api/radar/rss`, `/api/v1/radar/rss`) — the feed is
+deliberately open because it carries only already-public outbreak data and feed
+readers cannot present a bearer token.
+
+**Admin-only** (`Superadmin`, `Admin`, `Director`): `/api/v1/users*` and
+`/api/admin/*`.
+
+**CORS** is restricted to `https://ghi-pha.pages.dev`, its preview
+subdomains, and `localhost:5173`.
+
+### ⚠️ Required before the next production deploy
+
+`JWT_SECRET` was removed from `[vars]` in `wrangler.toml` because that file is
+committed, and the code now refuses to sign or verify tokens with the old
+`change-me-later` placeholder. **The Worker will return 500 on login until both
+secrets are set:**
+
+```bash
+cd backend
+npx wrangler secret put JWT_SECRET     # use a fresh 32-byte random value
+npx wrangler secret put DATABASE_URL
+npx wrangler deploy
+```
+
+Locally both live in `backend/.dev.vars` (gitignored). Note that rotating
+`JWT_SECRET` invalidates every existing session, which is intended.
+
 ## 🔐 Outstanding Security Items
 
 1. **Rotate the Neon database password.** It was previously hardcoded in
@@ -226,6 +262,25 @@ npx wrangler pages deploy dist --project-name=ghi-pha
    with `git log -S`), but it is present in `backend/.env`,
    `backend/.dev.vars`, and `scratch/test_db.js` on disk. All three are now
    gitignored. Rotate the password and update the Worker secret.
-2. **Passwords are stored in plain text** (`passwordHash` holds the raw value)
-   and **`JWT_SECRET` is `change-me-later`** in `wrangler.toml`. Both must be
-   fixed before any production use.
+2. **Passwords are stored in plain text** — `passwordHash` holds the raw value
+   and login compares it directly. This must be replaced with bcrypt or argon2
+   before production use.
+
+## 🗄️ Migrations
+
+`backend/migrations/` holds one-off data and schema migrations run with plain
+Node. Each is idempotent and dry-runs by default.
+
+```bash
+cd backend
+node migrations/001_radar_events_unique.mjs           # report only
+node migrations/001_radar_events_unique.mjs --apply   # execute
+```
+
+**001 — radar_events uniqueness (applied 2 Aug 2026).** Removed 63 duplicate
+rows (136 → 73), added a generated `content_hash` column
+(`md5(source_id || '::' || lower(btrim(title)))`), and created a unique index on
+it. `radar_events` previously had no natural unique constraint — its primary key
+is a random UUID — so `onConflictDoNothing()` could never fire. Duplicate groups
+kept a promoted row where one existed, so no triage signal lost its originating
+event.

@@ -5,7 +5,7 @@ import postgres from 'postgres';
 import * as schema from './db/schema';
 import { eq, desc, gte } from 'drizzle-orm';
 import { BeaconCollector } from './services/beacon-collector';
-import { sign } from 'hono/jwt';
+import { sign, verify } from 'hono/jwt';
 
 type Bindings = {
     HYPERDRIVE: Hyperdrive;
@@ -15,10 +15,97 @@ type Bindings = {
     DATABASE_URL?: string;
 };
 
-const app = new Hono<{ Bindings: Bindings }>();
+type SessionUser = {
+    id: string;
+    role: string;
+    permissions?: Record<string, string>;
+};
 
-// 1. ATOMIC CORS - SIMPLEST
-app.use('*', cors());
+type Variables = {
+    user: SessionUser;
+};
+
+const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
+
+// The placeholder value shipped in wrangler.toml is public, so treat it as
+// unset rather than signing tokens anyone could forge.
+const jwtSecret = (env: Bindings): string => {
+    const secret = env.JWT_SECRET;
+    if (!secret || secret === 'change-me-later') {
+        throw new Error(
+            'JWT_SECRET is not configured. Set it with `wrangler secret put JWT_SECRET` in production, or in backend/.dev.vars locally.'
+        );
+    }
+    return secret;
+};
+
+// Browsers may only call the API from the PHA front end. Non-browser callers
+// (RSS readers, cron, curl) send no Origin and are unaffected by this.
+const ALLOWED_ORIGINS = [
+    'https://ghi-pha.pages.dev',
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+];
+
+app.use('*', cors({
+    origin: (origin) => {
+        if (!origin) return undefined;
+        if (ALLOWED_ORIGINS.includes(origin)) return origin;
+        // Cloudflare Pages preview deployments: <hash>.ghi-pha.pages.dev
+        if (/^https:\/\/[a-z0-9-]+\.ghi-pha\.pages\.dev$/.test(origin)) return origin;
+        return undefined;
+    },
+    allowHeaders: ['Content-Type', 'Authorization'],
+    allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    maxAge: 86400,
+}));
+
+// Endpoints reachable without a session. The RSS feed is deliberately open —
+// it is a syndication endpoint carrying only already-public outbreak data, and
+// feed readers cannot present a bearer token.
+const PUBLIC_PATHS = new Set([
+    '/',
+    '/health',
+    '/api/v1/ping',
+    '/api/v1/auth/login',
+    '/api/radar/rss',
+    '/api/v1/radar/rss',
+]);
+
+app.use('*', async (c, next) => {
+    if (c.req.method === 'OPTIONS') return next();
+    if (PUBLIC_PATHS.has(new URL(c.req.url).pathname)) return next();
+
+    const header = c.req.header('Authorization') || '';
+    const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
+    if (!token) {
+        return c.json({ error: 'Authentication required' }, 401);
+    }
+
+    try {
+        // 'HS256' matches sign()'s default algorithm; verify requires it stated.
+        const payload = await verify(token, jwtSecret(c.env), 'HS256');
+        c.set('user', payload as unknown as SessionUser);
+    } catch {
+        return c.json({ error: 'Invalid or expired session' }, 401);
+    }
+    return next();
+});
+
+// Personnel administration and destructive operations are not open to analysts.
+const ADMIN_ROLES = new Set(['Superadmin', 'Admin', 'Director']);
+
+const requireAdmin = async (c: any, next: any) => {
+    const user = c.get('user') as SessionUser | undefined;
+    if (!user || !ADMIN_ROLES.has(user.role)) {
+        return c.json({ error: 'Insufficient permissions' }, 403);
+    }
+    return next();
+};
+
+app.use('/api/v1/users', requireAdmin);
+app.use('/api/v1/users/*', requireAdmin);
+app.use('/api/admin/*', requireAdmin);
 
 // Diagnostic Endpoint
 app.get('/api/v1/ping', (c) => {
@@ -109,7 +196,7 @@ app.post('/api/v1/auth/login', async (c) => {
             role: user.role,
             permissions: user.permissions,
             exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24
-        }, c.env.JWT_SECRET || 'ghi-dev-secret-key-2026');
+        }, jwtSecret(c.env));
 
         return c.json({
             token,

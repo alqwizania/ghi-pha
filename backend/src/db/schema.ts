@@ -122,6 +122,11 @@ export const radarEvents = pgTable("radar_events", {
     isPromoted: boolean("is_promoted").default(false),
     promotedSignalId: uuid("promoted_signal_id").references(() => signals.id),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+    // Generated in Postgres as md5(source_id || '::' || lower(btrim(title))) and
+    // backed by a unique index — see migrations/001_radar_events_unique.mjs.
+    // Never written by the application; declared here so drizzle-kit does not
+    // treat the column as drift.
+    contentHash: text("content_hash"),
 });
 
 export const users = pgTable("users", {

@@ -15,7 +15,7 @@ import {
   Rss,
   Search
 } from 'lucide-react';
-import { API_BASE_URL } from '../lib/api';
+import { API_BASE_URL, fetchRadarEvents, fetchRadarSources, triggerRadarScan, promoteRadarEvent } from '../lib/api';
 
 const geoUrl = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
@@ -180,8 +180,7 @@ export default function GlobalRadarView({ onPromoteToTriage }: GlobalRadarViewPr
 
   const fetchSources = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/radar/sources`);
-      if (res.ok) setSources(await res.json());
+      setSources(await fetchRadarSources());
     } catch {
       setSources([]);
     }
@@ -210,19 +209,13 @@ export default function GlobalRadarView({ onPromoteToTriage }: GlobalRadarViewPr
 
   const fetchRadarData = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/radar/events`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.length > 0) {
-          const parsed = data.map((e: any) => ({
-            ...e,
-            lat: Number(e.lat) || 20,
-            lng: Number(e.lng) || 30
-          }));
-          setEvents(parsed);
-        } else {
-          setEvents(seedEvents);
-        }
+      const data = await fetchRadarEvents();
+      if (data && data.length > 0) {
+        setEvents(data.map((e: any) => ({
+          ...e,
+          lat: Number(e.lat) || 20,
+          lng: Number(e.lng) || 30
+        })));
       } else {
         setEvents(seedEvents);
       }
@@ -240,8 +233,7 @@ export default function GlobalRadarView({ onPromoteToTriage }: GlobalRadarViewPr
     setScanning(true);
     setScanResult(null);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/radar/scan`, { method: 'POST' });
-      const result: ScanResult = await res.json();
+      const result: ScanResult = await triggerRadarScan();
       setScanResult(result);
       await fetchRadarData();
     } catch {
@@ -254,17 +246,12 @@ export default function GlobalRadarView({ onPromoteToTriage }: GlobalRadarViewPr
   const handlePromoteToTriage = async (event: RadarEvent) => {
     setPromotingId(event.id);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/radar/promote`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ eventId: event.id })
-      });
-      if (res.ok) {
-        setEvents(prev => prev.map(e => e.id === event.id ? { ...e, isPromoted: true } : e));
-        if (onPromoteToTriage) onPromoteToTriage();
-      }
-    } catch {
+      await promoteRadarEvent(event.id);
       setEvents(prev => prev.map(e => e.id === event.id ? { ...e, isPromoted: true } : e));
+      if (onPromoteToTriage) onPromoteToTriage();
+    } catch {
+      // Leave the event un-promoted so the operator can retry rather than
+      // seeing a success state for a promotion that did not happen.
     } finally {
       setPromotingId(null);
     }
