@@ -1266,6 +1266,7 @@ export async function scoreAndPromotePending(
               tier: result.tier,
               domainsAtTwo: result.domainsAtTwo,
               mandatoryIhr: result.mandatoryIhr,
+              confidence: result.confidence,
               severity: result.severity,
               unusualness: result.unusualness,
               spread: result.spread,

@@ -5,6 +5,8 @@ import postgres from 'postgres';
 import * as schema from './db/schema';
 import { eq, desc, gte } from 'drizzle-orm';
 import { sign, verify } from 'hono/jwt';
+import { buildDraft, scoreFromRow, type MachineDraft } from './services/assessment-drafter';
+import type { ScoreResult } from './services/signal-scoring';
 
 type Bindings = {
     HYPERDRIVE: Hyperdrive;
@@ -283,22 +285,112 @@ app.get('/api/v1/signals', async (c) => {
 app.post('/api/v1/signals/:id/accept', async (c) => {
     const id = c.req.param('id');
     const db = getDB(c.env);
+    const actor = c.get('user');
 
-    // Update signal status
+    const signal = await db.query.signals.findFirst({ where: eq(schema.signals.id, id) });
+    if (!signal) return c.json({ error: 'Signal not found' }, 404);
+
     await db.update(schema.signals)
-        .set({ triageStatus: 'Accepted', currentStatus: 'Under Assessment' })
+        .set({
+            triageStatus: 'Accepted',
+            currentStatus: 'Under Assessment',
+            triagedBy: actor?.id,
+            triagedAt: new Date(),
+        })
         .where(eq(schema.signals.id, id));
 
-    // Create linked assessment
+    // An accepted signal opens with a completed first pass rather than a blank
+    // form. The draft is written to both the live columns and machine_draft;
+    // from here only the live columns move, so any later divergence is the
+    // analyst's override with nothing extra to record. See assessment-drafter.ts.
+    const draft = await draftForSignal(db, signal);
+
     const [newAssessment] = await db.insert(schema.assessments).values({
         signalId: id,
         assessmentType: 'IHR/RRA',
-        assignedTo: '00000000-0000-0000-0000-000000000000', // Default placeholder or current user
-        status: 'Draft'
+        assignedTo: actor?.id ?? '00000000-0000-0000-0000-000000000000',
+        status: 'Draft',
+        ...(draft
+            ? {
+                ihrQuestion1: draft.ihr.q1, ihrQuestion1Notes: draft.ihr.q1Notes,
+                ihrQuestion2: draft.ihr.q2, ihrQuestion2Notes: draft.ihr.q2Notes,
+                ihrQuestion3: draft.ihr.q3, ihrQuestion3Notes: draft.ihr.q3Notes,
+                ihrQuestion4: draft.ihr.q4, ihrQuestion4Notes: draft.ihr.q4Notes,
+                ihrDecision: draft.ihr.decision,
+                rraHazardAssessment: draft.rra.hazard,
+                rraExposureAssessment: draft.rra.exposure,
+                rraContext_assessment: draft.rra.context,
+                rraOverallRisk: draft.rra.overallRisk,
+                rraConfidenceLevel: draft.rra.confidenceLevel,
+                rraKeyUncertainties: draft.rra.keyUncertainties,
+                rraRecommendations: draft.rra.recommendations,
+                machineDraft: draft,
+                machineDrafterVersion: draft.drafterVersion,
+                machineScorerVersion: draft.scorerVersion,
+                machineGeneratedAt: new Date(draft.generatedAt),
+                machineConfidence: draft.rra.confidenceLevel,
+            }
+            : {}),
     }).returning();
 
-    return c.json({ success: true, assessmentId: newAssessment.id });
+    return c.json({ success: true, assessmentId: newAssessment.id, drafted: Boolean(draft) });
 });
+
+/**
+ * Builds the machine draft for a signal, preferring the stored `event_scores`
+ * row (authoritative, carries confidence) and falling back to the copy of the
+ * score the collector attached to the signal. Returns null when neither exists —
+ * a manually created or listener signal opens with a blank form, as before.
+ */
+async function draftForSignal(
+    db: ReturnType<typeof getDB>,
+    signal: typeof schema.signals.$inferSelect
+): Promise<MachineDraft | null> {
+    let score: ScoreResult | null = null;
+
+    if (signal.radarEventId) {
+        const row = await db.query.eventScores.findFirst({
+            where: eq(schema.eventScores.radarEventId, signal.radarEventId),
+        });
+        if (row) score = scoreFromRow(row);
+    }
+
+    if (!score) {
+        const stored = (signal.rawData as { score?: Record<string, unknown> } | null)?.score;
+        if (stored && typeof stored === 'object') {
+            score = scoreFromRow({
+                severity: (stored.severity as { score: number })?.score ?? 0,
+                unusualness: (stored.unusualness as { score: number })?.score ?? 0,
+                spread: (stored.spread as { score: number })?.score ?? 0,
+                tradeTravel: (stored.tradeTravel as { score: number })?.score ?? 0,
+                ksaRelevance: (stored.ksaRelevance as { score: number })?.score ?? 0,
+                domainsAtTwo: (stored.domainsAtTwo as number) ?? 0,
+                tier: (stored.tier as string) ?? 'routine',
+                mandatoryIhr: (stored.mandatoryIhr as boolean) ?? false,
+                confidence: (stored.confidence as string) ?? 'medium',
+                evidence: {
+                    severity: (stored.severity as { reasons: string[] })?.reasons ?? [],
+                    unusualness: (stored.unusualness as { reasons: string[] })?.reasons ?? [],
+                    spread: (stored.spread as { reasons: string[] })?.reasons ?? [],
+                    tradeTravel: (stored.tradeTravel as { reasons: string[] })?.reasons ?? [],
+                    ksaRelevance: (stored.ksaRelevance as { reasons: string[] })?.reasons ?? [],
+                },
+            });
+        }
+    }
+
+    if (!score) return null;
+
+    return buildDraft({
+        disease: signal.disease,
+        country: signal.country,
+        cases: signal.cases,
+        deaths: signal.deaths,
+        sourceName: signal.sourceName,
+        dateReported: signal.dateReported,
+        score,
+    });
+}
 
 app.post('/api/v1/signals/:id/reject', async (c) => {
     const id = c.req.param('id');
@@ -322,16 +414,31 @@ app.put('/api/v1/assessments/:id', async (c) => {
     const body = await c.req.json();
     const db = getDB(c.env);
 
+    const actor = c.get('user');
+
+    // Only the live columns are written here. machine_draft is never touched
+    // after the accept that created it, which is what makes the analyst's answer
+    // authoritative by construction rather than by a precedence rule.
     await db.update(schema.assessments)
         .set({
             ihrQuestion1: body.q1,
             ihrQuestion2: body.q2,
             ihrQuestion3: body.q3,
             ihrQuestion4: body.q4,
+            ihrQuestion1Notes: body.q1Notes,
+            ihrQuestion2Notes: body.q2Notes,
+            ihrQuestion3Notes: body.q3Notes,
+            ihrQuestion4Notes: body.q4Notes,
+            ihrDecision: body.ihrDecision,
             rraOverallRisk: body.riskLevel,
             rraHazardAssessment: body.hazard,
             rraExposureAssessment: body.exposure,
             rraContext_assessment: body.context,
+            rraConfidenceLevel: body.confidenceLevel,
+            // An analyst who reads the draft and agrees with it has still done
+            // the review, so this is set on save, not on change.
+            humanReviewedAt: new Date(),
+            reviewedBy: actor?.id,
             updatedAt: new Date()
         })
         .where(eq(schema.assessments.id, id));

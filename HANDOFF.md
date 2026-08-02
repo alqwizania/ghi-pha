@@ -321,13 +321,8 @@ In priority order, with reasoning:
    `retrieveSource()` in `radar-collector.ts` — the code path exists and
    currently returns a clear "not configured" diagnostic.
 
-2. **Automated assessment (was Phase 4)** — add `machine_draft` JSONB plus
-   `machine_model` / `machine_generated_at` / `machine_confidence` to
-   `assessments`. On accept, high-tier signals get an auto-generated IHR Annex 2
-   answer set and RRA draft written to **both** the frozen draft and the live
-   fields. Analyst edits change only the live fields, so any divergence *is* the
-   human override with no extra flags. Scoring already supplies the IHR domain
-   answers, so the draft is largely a mapping exercise.
+2. **Auto-provisioning allowlist** — see the login section below. Any address
+   ending `@pha.gov.sa` still self-registers as Superadmin.
 
 3. **Queue split** — a forced full scan takes ~5 minutes in one request.
    Fetch queue + extract queue makes each source an independent message.
@@ -438,6 +433,76 @@ count, and among them were "measles outbreak in Delaware" and an Ebola
 escalation. The first report of an outbreak almost never has a number, and that
 is exactly the signal worth having. Currently 53 actionable of 111 total.
 
+## 🧾 Automated Assessment (Phase 4 — done, 3 Aug 2026)
+
+Accepting a signal in triage now opens a **completed** IHR Annex 2 answer set
+and RRA draft rather than a blank form. Implementation:
+[`assessment-drafter.ts`](file:///d:/Vibecoding/GHI%20System/backend/src/services/assessment-drafter.ts).
+
+### How the override works
+
+There is no precedence flag and no "who wins" logic, because there does not need
+to be. On accept the draft is written **twice**: once into `machine_draft`,
+which is frozen and never rewritten, and once into the live assessment columns.
+The analyst edits only the live columns. The difference between the two *is* the
+override record, which means you can ask the database where a human disagreed
+with the machine and on what, without any extra bookkeeping.
+
+`human_reviewed_at` is set on save, not on change — an analyst who reads the
+draft and agrees with it has still performed the review, and that is a different
+fact from having changed nothing because nobody looked.
+
+### No model call is involved
+
+Every answer and every sentence in the draft derives from the deterministic
+domain scores in `signal-scoring.ts`. The four Annex 2 answers are the four IHR
+domains thresholded at 2 — the same cut the triage tier uses — so the draft
+cannot contradict the score that promoted the signal. A health authority has to
+be able to explain why a draft said "notify WHO"; "the model judged it so" is
+not an explanation that survives review. The model's role stays where it was:
+reading facts out of source text.
+
+The draft also carries `keyUncertainties` and `recommendations`. The
+uncertainties are the things a reviewer would otherwise have to notice were
+*missing* — no case counts, no baseline on record, single uncorroborated source —
+which is exactly what gets missed under load.
+
+### Drafted for every accepted signal, not only high-tier ones
+
+A slight widening of the original spec. An accepted signal has already cleared
+human triage, so withholding a starting point from the moderate ones only
+produces blank forms. The tier is recorded in the draft either way.
+
+### Verified against live data
+
+`npx tsx scripts/preview-assessment-drafts.mts` renders the draft each pending
+signal would receive, without writing anything. Reviewing its output caught
+three defects worth knowing about, since they are the failure modes this kind of
+generated prose has:
+
+1. The hazard leg read *"2,226 cases and 869 deaths reported. 869 deaths
+   reported."* — domains overlap by design, so `sentences()` now drops any
+   reason another reason already contains.
+2. A **NO** on international spread was justified by the words *"faecal-oral
+   transmission route"*, which reads as an argument for the opposite answer.
+   Sub-threshold notes are now prefixed with "Below the Annex 2 threshold on the
+   reported information."
+3. Dates rendered as *"Sun Aug 02"* — `postgres.js` returns `date` columns as
+   `Date` objects while the Worker path gets strings.
+
+End-to-end test on the live MERS-CoV Saudi Arabia signal: accept produced
+Q1 yes / Q2 no / Q3 yes / Q4 no → **Notify WHO**, Critical risk at High
+confidence, 5 recommendations. A subsequent PUT flipping Q2 to yes moved the
+live column while `machine_draft.ihr.q2` stayed `false`. The test acceptance was
+then reverted, so the triage queue is untouched.
+
+**Note on the MERS row itself:** its 2,226 cases / 869 deaths are the cumulative
+Saudi total since 2012, not a new outbreak, so the draft's "11.1x the expected
+annual total" is arithmetically right and epidemiologically misleading. That is
+an extraction-scope problem, not a drafting one, and it is the strongest current
+argument for teaching the extractor to distinguish cumulative from incident
+counts.
+
 ## 📊 Dashboard
 
 The "GCC & Regional Border Threat Level" panel was a **hardcoded array** —
@@ -479,6 +544,21 @@ readers cannot present a bearer token.
 **Admin-only** (`Superadmin`, `Admin`, `Director`): `/api/v1/users*` and
 `/api/admin/*`.
 
+### 🔴 Login did not check the password (fixed 3 Aug 2026)
+
+`/api/v1/auth/login` accepted a password, looked the user up by email, and
+issued a token without ever comparing the two. Any known `@pha.gov.sa` address
+was a valid login — and because unknown `@pha.gov.sa` addresses are
+auto-provisioned as **Superadmin**, so was any address that merely ended in the
+right domain. The comparison is now in place and a missing field returns 400
+instead of a 500 carrying the driver's error text.
+
+**Still open, and it is a decision rather than a bug:** the auto-provisioning
+branch means the first person to type any `@pha.gov.sa` address still sets that
+account's password and receives Superadmin. If that was meant as a convenience
+for onboarding colleagues, it needs at minimum an allowlist. The comparison is
+also still plaintext against plaintext — see Outstanding Security Items.
+
 **CORS** is restricted to `https://ghi-pha.pages.dev`, its preview
 subdomains, and `localhost:5173`.
 
@@ -508,7 +588,11 @@ Locally both live in `backend/.dev.vars` (gitignored). Note that rotating
    gitignored. Rotate the password and update the Worker secret.
 2. **Passwords are stored in plain text** — `passwordHash` holds the raw value
    and login compares it directly. This must be replaced with bcrypt or argon2
-   before production use.
+   before production use. Note that the comparison itself was missing until
+   3 Aug 2026; see the login section above.
+3. **Any `@pha.gov.sa` address self-registers as Superadmin** via the
+   auto-provisioning branch in the login handler. Deliberate, but it needs an
+   allowlist before production.
 
 ## 🗄️ Migrations
 
@@ -520,6 +604,13 @@ cd backend
 node migrations/001_radar_events_unique.mjs           # report only
 node migrations/001_radar_events_unique.mjs --apply   # execute
 ```
+
+**014 — machine assessment (applied 3 Aug 2026).** Added `machine_draft` and its
+provenance columns plus `human_reviewed_at` to `assessments`, and widened
+`ihr_decision` to 80 chars. Backfill for pre-existing assessments is a separate
+script (`npx tsx scripts/backfill-assessment-drafts.mts --apply`); it skips any
+assessment an analyst has already worked on. All 6 existing assessments predate
+the source repairs and carry no score, so the backfill is currently a no-op.
 
 **013 — actionability filter (applied 2 Aug 2026).** Purged 122 legacy
 naive-extractor rows (identifiable by their "Headline detected from …"

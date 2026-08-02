@@ -64,6 +64,17 @@ export const assessments = pgTable("assessments", {
     status: varchar("status", { length: 50 }).default("Draft"),
     assignedTo: uuid("assigned_to").notNull(),
     reviewedBy: uuid("reviewed_by"),
+    // The frozen machine first pass, written once on accept. The live columns
+    // above start as a copy of it and are the analyst's from then on, so the
+    // difference between the two *is* the human override. Added by migration 014.
+    machineDraft: jsonb("machine_draft"),
+    machineDrafterVersion: varchar("machine_drafter_version", { length: 40 }),
+    machineScorerVersion: varchar("machine_scorer_version", { length: 20 }),
+    machineGeneratedAt: timestamp("machine_generated_at", { withTimezone: true }),
+    machineConfidence: varchar("machine_confidence", { length: 10 }),
+    // That a person opened and saved the assessment — a different fact from
+    // having changed anything. Agreeing with the draft is still a review.
+    humanReviewedAt: timestamp("human_reviewed_at", { withTimezone: true }),
     outcomeDecision: varchar("outcome_decision", { length: 50 }),
     outcomeJustification: text("outcome_justification"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
