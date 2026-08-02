@@ -14,6 +14,7 @@
  *   npx tsx scripts/verify-extraction.mts ECDC       # just one
  */
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import postgres from 'postgres';
 import { extractEvents, htmlToText } from '../src/services/event-extractor.js';
 
@@ -21,7 +22,7 @@ const UA = 'GHI-PHA-Radar/1.0 (Public Health Authority, Saudi Arabia)';
 
 function fromDevVars(key: string): string | undefined {
   try {
-    const raw = readFileSync(new URL('../.dev.vars', import.meta.url), 'utf8');
+    const raw = readFileSync(fileURLToPath(new URL('../.dev.vars', import.meta.url)), 'utf8');
     const match = raw.match(new RegExp(`^${key}=(.*)$`, 'm'));
     return match ? match[1].trim().replace(/^"|"$/g, '') : undefined;
   } catch {

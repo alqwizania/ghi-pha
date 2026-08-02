@@ -158,6 +158,12 @@ export async function extractEvents(
             model: 'claude-opus-5',
             max_tokens: 16000,
             system: SYSTEM_PROMPT,
+            // Effort is left at the default deliberately. Dropping it to 'low'
+            // cut cost ~27% but lost rows that matter: it stopped splitting a
+            // multi-country outbreak into one row per country, and dropped the
+            // Saudi-Arabia-specific MERS figures in favour of the global total.
+            // For a Saudi health authority that is the single most valuable row
+            // on the page, so the saving is not worth taking.
             output_config: { format: { type: 'json_schema', schema: EXTRACTION_SCHEMA } },
             messages: [
                 {
