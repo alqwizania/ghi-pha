@@ -157,6 +157,12 @@ app.post('/api/v1/auth/login', async (c) => {
         const { email, password } = body;
         console.log(`Login payload for: ${email}`);
 
+        // Without this a missing field reached the query layer and surfaced as a
+        // 500 with a driver message, which tells an attacker more than it tells us.
+        if (typeof email !== 'string' || !email || typeof password !== 'string' || !password) {
+            return c.json({ error: 'Email and password are required' }, 400);
+        }
+
         const db = getDB(c.env);
 
         let user = await db.query.users.findFirst({
@@ -191,6 +197,17 @@ app.post('/api/v1/auth/login', async (c) => {
         // Strict PHA Domain Enforcement
         if (!user.email.endsWith('@pha.gov.sa')) {
             return c.json({ error: 'Access restricted to @pha.gov.sa domains' }, 403);
+        }
+
+        // The password was collected and then never checked: any known
+        // @pha.gov.sa address was issued a token, and for most of them a
+        // Superadmin one. The comparison below is the minimum fix. It is still
+        // a plaintext comparison because `password_hash` holds plaintext —
+        // hashing the column is tracked separately and changes this line to a
+        // verify() call, not the surrounding logic.
+        if (user.passwordHash !== password) {
+            console.log(`Password mismatch for: ${email}`);
+            return c.json({ error: 'Invalid credentials' }, 401);
         }
 
         const token = await sign({
