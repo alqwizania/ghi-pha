@@ -1,4 +1,4 @@
-import { surveillanceSources, radarEvents, signals } from '../db/schema';
+import { surveillanceSources, sourceSnapshots, radarEvents, signals } from '../db/schema';
 import { eq, gte } from 'drizzle-orm';
 
 // ============================================================
@@ -284,6 +284,72 @@ async function safeFetch(url: string, timeoutMs = 8000): Promise<FetchOutcome> {
 }
 
 // ============================================================
+// SOURCE REGISTRY + CHANGE DETECTION
+// ============================================================
+// A source row drives its own retrieval: `fetchStrategy` picks the transport,
+// `parserHint` picks the extractor. Adding a source is a database insert, not
+// a code change.
+export interface RegisteredSource {
+  id: string;
+  name: string;
+  url: string;
+  fetchStrategy: 'json' | 'rss' | 'html' | 'browser' | 'rsshub';
+  parserHint: string | null;
+  fetchIntervalHours: number;
+  config: Record<string, any>;
+}
+
+/**
+ * Strips the parts of a response that change on every request without the
+ * content having changed — timestamps, cache-busting query strings, CSRF
+ * tokens, session ids, and the nonce attributes most CDNs inject. Without this
+ * every poll of a government portal looks like a fresh outbreak.
+ */
+function normalizeForHash(body: string): string {
+  return body
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/\b\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2})?(\.\d+)?Z?\b/g, '')
+    .replace(/\b\d{2}:\d{2}:\d{2}\b/g, '')
+    .replace(/(nonce|csrf[-_]?token|session[-_]?id|_?requestid|build[-_]?id)=["']?[\w-]+["']?/gi, '')
+    .replace(/[?&](v|t|ts|cb|cache|_)=\d+/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+async function sha256(text: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+/**
+ * Retrieves a source's raw body. Everything except 'browser' is a plain HTTP
+ * fetch; 'browser' renders the page with Cloudflare Browser Rendering for
+ * sites that assemble their content client-side.
+ */
+async function retrieveSource(source: RegisteredSource, env?: any): Promise<FetchOutcome> {
+  if (source.fetchStrategy === 'rsshub') {
+    return { body: null, status: 'disabled', detail: 'RSSHub strategy requires a configured RSSHub instance' };
+  }
+
+  // Reserved for pages that only assemble their content client-side. Enabling
+  // it needs three things: the `@cloudflare/puppeteer` package, a [browser]
+  // binding in wrangler.toml, and Browser Rendering enabled on the account.
+  // No source is registered with this strategy yet — the scan diagnostics
+  // identify which ones need it (reachable, but extracting nothing).
+  if (source.fetchStrategy === 'browser') {
+    return {
+      body: null,
+      status: 'disabled',
+      detail: 'Source requires JavaScript rendering; Browser Rendering is not yet enabled on this Worker',
+    };
+  }
+
+  return safeFetch(source.url, 15000);
+}
+
+// ============================================================
 // SIMPLE XML TAG EXTRACTOR (no external XML parser needed)
 // ============================================================
 function extractXmlTags(xml: string, tag: string): string[] {
@@ -320,12 +386,10 @@ interface ParsedEvent {
 // ============================================================
 // FETCHER 1: WHO Disease Outbreak News (JSON API)
 // ============================================================
-async function fetchWHO_DONs(): Promise<SourceResult> {
+function parseWHO_DONs(body: string): SourceResult {
   const cutoff = cutoffDate();
-  const res = await safeFetch('https://www.who.int/api/news/diseaseoutbreaknews?sf_culture=en&$orderby=PublicationDate%20desc&$top=30');
-  if (!res.body) return failed('WHO_DONS', res.status, res.detail);
   try {
-    const data = JSON.parse(res.body);
+    const data = JSON.parse(body);
     const items = data.value || [];
     const events = items
       .filter((item: any) => {
@@ -367,12 +431,10 @@ async function fetchWHO_DONs(): Promise<SourceResult> {
 // ============================================================
 // The xMART view exposes DATE / TOTAL_CONF_DEATHS. Ordering or reading any
 // other field name makes the OData endpoint reject the query with HTTP 400.
-async function fetchWHO_Mpox(): Promise<SourceResult> {
+function parseWHO_Mpox(body: string): SourceResult {
   const cutoff = cutoffDate();
-  const res = await safeFetch('https://xmart-api-public.who.int/MPX/V_MPX_VALIDATED_DAILY?$orderby=DATE%20desc&$top=300');
-  if (!res.body) return failed('WHO_MPX_API', res.status, res.detail);
   try {
-    const data = JSON.parse(res.body);
+    const data = JSON.parse(body);
     const items = data.value || [];
     // Group by country, take latest per country
     const byCountry = new Map<string, any>();
@@ -420,18 +482,12 @@ async function fetchWHO_Mpox(): Promise<SourceResult> {
 // ReliefWeb decommissioned API v1 (HTTP 410) and v2 rejects unregistered
 // callers with HTTP 403. Re-enable by setting RELIEFWEB_APPNAME once PHA has
 // an approved appname from https://apidoc.reliefweb.int.
-const RELIEFWEB_APPNAME = '';
+export const RELIEFWEB_APPNAME = '';
 
-async function fetchReliefWeb(): Promise<SourceResult> {
-  if (!RELIEFWEB_APPNAME) {
-    return failed('RELIEFWEB', 'disabled', 'ReliefWeb API v2 requires an approved appname; none configured');
-  }
+function parseReliefWeb(body: string): SourceResult {
   const cutoff = cutoffDate();
-  const url = `https://api.reliefweb.int/v2/reports?appname=${RELIEFWEB_APPNAME}&limit=20&sort[]=date:desc&filter[field]=theme&filter[value][]=Health&filter[value][]=Epidemic&fields[include][]=title&fields[include][]=date.original&fields[include][]=country.name&fields[include][]=body-html&fields[include][]=url`;
-  const res = await safeFetch(url);
-  if (!res.body) return failed('RELIEFWEB', res.status, res.detail);
   try {
-    const data = JSON.parse(res.body);
+    const data = JSON.parse(body);
     const items = data.data || [];
     const events = items
       .filter((item: any) => {
@@ -473,11 +529,8 @@ async function fetchReliefWeb(): Promise<SourceResult> {
 // ============================================================
 // GENERIC RSS FEED PARSER
 // ============================================================
-async function fetchRSS(sourceId: string, sourceName: string, feedUrl: string): Promise<SourceResult> {
+function parseRSS(sourceId: string, sourceName: string, feedUrl: string, xml: string): SourceResult {
   const cutoff = cutoffDate();
-  const res = await safeFetch(feedUrl);
-  if (!res.body) return failed(sourceId, res.status, res.detail);
-  const xml = res.body;
   try {
     const titles = extractXmlTags(xml, 'title');
     const links = extractXmlTags(xml, 'link');
@@ -533,10 +586,7 @@ async function fetchRSS(sourceId: string, sourceName: string, feedUrl: string): 
 // ============================================================
 // GENERIC HTML TITLE EXTRACTOR
 // ============================================================
-async function fetchHTMLTitles(sourceId: string, sourceName: string, pageUrl: string): Promise<SourceResult> {
-  const res = await safeFetch(pageUrl);
-  if (!res.body) return failed(sourceId, res.status, res.detail);
-  const html = res.body;
+function parseHTMLTitles(sourceId: string, sourceName: string, pageUrl: string, html: string): SourceResult {
   try {
     // Extract article/news titles from common HTML patterns
     const patterns = [
@@ -629,68 +679,168 @@ export async function initializeSources(db: any) {
 }
 
 // ============================================================
-// MAIN SCAN: FETCH ALL REAL SOURCES IN PARALLEL
+// PARSER DISPATCH
 // ============================================================
-export async function fetchGlobalRadarScan(db?: any) {
-  if (db) await initializeSources(db);
+function parseSource(source: RegisteredSource, body: string): SourceResult {
+  switch (source.parserHint) {
+    case 'who_dons':
+      return parseWHO_DONs(body);
+    case 'who_mpox':
+      return parseWHO_Mpox(body);
+    case 'reliefweb':
+      return parseReliefWeb(body);
+    case 'rss':
+      return parseRSS(source.id, source.name, source.url, body);
+    default:
+      // Anything registered without a specific extractor is treated as a page
+      // of headlines. This is a deliberately weak default — it is what the
+      // structured-extraction phase replaces.
+      return source.fetchStrategy === 'rss'
+        ? parseRSS(source.id, source.name, source.url, body)
+        : parseHTMLTitles(source.id, source.name, source.url, body);
+  }
+}
 
-  // CIDRAP retired its site-wide rss.xml (it still resolves but has been
-  // frozen since 2022). Live content is only published on per-topic feeds.
-  const cidrapTopics: Array<[string, string]> = [
-    ['Misc Emerging Topics', '31175'],
-    ['COVID-19', '178636'],
-    ['Avian Influenza', '49'],
-    ['Measles', '78'],
-    ['Ebola', '64'],
-    ['Mpox', '230556'],
-    ['Cholera', '58'],
-    ['MERS-CoV', '84'],
-  ];
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return url;
+  }
+}
 
-  // Run all fetchers in parallel with individual error isolation
-  const results = await Promise.allSettled([
-    // Tier 1: JSON APIs
-    fetchWHO_DONs(),
-    fetchWHO_Mpox(),
-    fetchReliefWeb(),
-    // Tier 2: RSS Feeds
-    fetchRSS('CDC_TRAVEL', 'CDC Travel Health Notices', 'https://tools.cdc.gov/api/v2/resources/media/316422.rss'),
-    fetchRSS('WHO_NEWS', 'WHO News & Features', 'https://www.who.int/rss-feeds/news-english.xml'),
-    fetchRSS('PAHO', 'PAHO Pan American Health', 'https://www.paho.org/en/rss.xml'),
-    ...cidrapTopics.map(([topic, id]) =>
-      fetchRSS('CIDRAP', `CIDRAP — ${topic}`, `https://www.cidrap.umn.edu/news/${id}/rss`)),
-    // Tier 3: HTML Extraction
-    fetchHTMLTitles('WHO_AFRO', 'WHO AFRO Africa Outbreaks', 'https://www.afro.who.int/health-topics/disease-outbreaks'),
-    fetchHTMLTitles('ECDC', 'ECDC Communicable Disease Threats', 'https://www.ecdc.europa.eu/en/threats-and-outbreaks'),
-  ]);
+/**
+ * Runs one task per source with bounded concurrency, but never two against the
+ * same host at once — four concurrent requests to cdc.gov got the whole scan
+ * rate-limited with 403s, while the same requests spaced out succeed. Different
+ * hosts still run in parallel, so the scan stays fast.
+ */
+async function mapByHost<T extends { url: string }, R>(
+  items: T[],
+  hostLimit: number,
+  perHostDelayMs: number,
+  fn: (item: T) => Promise<R>
+): Promise<R[]> {
+  const byHost = new Map<string, { item: T; index: number }[]>();
+  items.forEach((item, index) => {
+    const host = hostOf(item.url);
+    if (!byHost.has(host)) byHost.set(host, []);
+    byHost.get(host)!.push({ item, index });
+  });
 
-  // Collect events and keep the worst diagnostic seen per source, so one
-  // healthy CIDRAP topic feed cannot mask another that has broken.
+  const results: R[] = new Array(items.length);
+  const groups = [...byHost.values()];
+  let cursor = 0;
+
+  const workers = Array.from({ length: Math.min(hostLimit, groups.length) }, async () => {
+    while (cursor < groups.length) {
+      const group = groups[cursor++];
+      for (let i = 0; i < group.length; i++) {
+        if (i > 0 && perHostDelayMs > 0) {
+          await new Promise((resolve) => setTimeout(resolve, perHostDelayMs));
+        }
+        results[group[i].index] = await fn(group[i].item);
+      }
+    }
+  });
+
+  await Promise.all(workers);
+  return results;
+}
+
+// ============================================================
+// MAIN SCAN: REGISTRY-DRIVEN, HASH-GATED
+// ============================================================
+// Sources come from the database, not from a hardcoded list. Each is fetched,
+// normalized, and hashed; extraction only runs when the hash moved since the
+// last scan. That gating is what makes a 40-source registry affordable and is
+// the reason no self-hosted change-detection service is needed.
+export async function fetchGlobalRadarScan(db?: any, env?: any, options: { force?: boolean } = {}) {
   const cutoff = cutoffDate();
   const allEvents: ParsedEvent[] = [];
   const sourceStats: Record<string, number> = {};
   const diagnostics: Record<string, string> = {};
   const degraded: string[] = [];
+  let checkedCount = 0;
+  let unchangedCount = 0;
 
-  for (const result of results) {
-    if (result.status === 'rejected') {
-      console.error('[GHI Radar] Fetcher rejected unexpectedly:', result.reason);
-      continue;
+  if (!db) {
+    return {
+      status: 'error', count: 0, inserted: 0, skippedDuplicates: 0,
+      checked: 0, unchanged: 0, cutoffDate: cutoff,
+      sources: sourceStats, degraded: ['DATABASE'],
+      diagnostics: { DATABASE: 'No database connection; the source registry could not be read' },
+    };
+  }
+
+  const registered = await db.query.surveillanceSources.findMany({
+    where: eq(surveillanceSources.enabled, true),
+  });
+
+  const snapshotRows = await db.query.sourceSnapshots.findMany();
+  const snapshots = new Map<string, any>(snapshotRows.map((s: any) => [s.sourceId, s]));
+
+  const now = Date.now();
+  const due = registered.filter((s: any) => {
+    if (options.force) return true;
+    const snap = snapshots.get(s.id);
+    if (!snap?.lastFetchedAt) return true;
+    const intervalMs = Math.max(1, s.fetchIntervalHours ?? 6) * 3600_000;
+    return now - new Date(snap.lastFetchedAt).getTime() >= intervalMs;
+  });
+
+  console.log(`[GHI Radar] ${registered.length} enabled sources, ${due.length} due this pass`);
+
+  const outcomes = await mapByHost(due, 10, 1200, async (source: any) => {
+    const spec: RegisteredSource = {
+      id: source.id,
+      name: source.name,
+      url: source.url,
+      fetchStrategy: source.fetchStrategy,
+      parserHint: source.parserHint,
+      fetchIntervalHours: source.fetchIntervalHours ?? 6,
+      config: source.config ?? {},
+    };
+    const snap = snapshots.get(spec.id);
+    const fetchedAt = new Date();
+
+    const retrieved = await retrieveSource(spec, env);
+    if (!retrieved.body) {
+      return {
+        spec, fetchedAt, changed: false, hash: snap?.contentHash ?? null, bytes: 0,
+        result: failed(spec.id, retrieved.status, retrieved.detail),
+      };
     }
-    const { sourceId, events, status, detail } = result.value;
-    sourceStats[sourceId] = (sourceStats[sourceId] || 0) + events.length;
-    allEvents.push(...events);
 
-    if (status !== 'ok' && status !== 'empty') {
-      // A hard failure always wins: the source is broken, not merely quiet.
-      diagnostics[sourceId] = `${status}: ${detail}`;
-      if (!degraded.includes(sourceId)) degraded.push(sourceId);
-    } else if (status === 'empty' && !diagnostics[sourceId]) {
-      diagnostics[sourceId] = `empty: ${detail}`;
+    const hash = await sha256(normalizeForHash(retrieved.body));
+    const changed = hash !== snap?.contentHash;
+
+    if (!changed) {
+      return {
+        spec, fetchedAt, changed: false, hash, bytes: retrieved.body.length,
+        result: { sourceId: spec.id, events: [], status: 'ok' as DiagnosticStatus, detail: 'unchanged since last scan' },
+      };
+    }
+
+    return { spec, fetchedAt, changed: true, hash, bytes: retrieved.body.length, result: parseSource(spec, retrieved.body) };
+  });
+
+  for (const outcome of outcomes) {
+    const { spec, result, changed } = outcome;
+    checkedCount++;
+    if (!changed && result.status === 'ok') unchangedCount++;
+
+    sourceStats[spec.id] = (sourceStats[spec.id] || 0) + result.events.length;
+    allEvents.push(...result.events);
+
+    if (result.status !== 'ok' && result.status !== 'empty') {
+      diagnostics[spec.id] = `${result.status}: ${result.detail}`;
+      if (!degraded.includes(spec.id)) degraded.push(spec.id);
+    } else if (result.status === 'empty' && !diagnostics[spec.id]) {
+      diagnostics[spec.id] = `empty: ${result.detail}`;
     }
   }
 
-  // Drop benign "empty" notes for sources that other feeds filled in anyway.
   for (const sourceId of Object.keys(diagnostics)) {
     if (sourceStats[sourceId] > 0 && diagnostics[sourceId].startsWith('empty:')) {
       delete diagnostics[sourceId];
@@ -698,7 +848,10 @@ export async function fetchGlobalRadarScan(db?: any) {
   }
 
   const liveSources = Object.keys(sourceStats).filter((s) => sourceStats[s] > 0);
-  console.log(`[GHI Radar] Fetched ${allEvents.length} events from ${liveSources.length} live sources:`, sourceStats);
+  console.log(
+    `[GHI Radar] checked ${checkedCount}, ${unchangedCount} unchanged, ` +
+    `${allEvents.length} events from ${liveSources.length} sources`
+  );
   if (degraded.length > 0) {
     console.error(`[GHI Radar] ${degraded.length} source(s) DEGRADED:`,
       degraded.map((s) => `${s} (${diagnostics[s]})`).join(' | '));
@@ -764,11 +917,54 @@ export async function fetchGlobalRadarScan(db?: any) {
     skippedCount = skipped;
   }
 
+  // Record what happened to each source. This is both the change-detection
+  // state for the next scan and the health data the sources drawer reads, so
+  // it survives beyond the lifetime of a single scan response.
+  for (const outcome of outcomes) {
+    const { spec, fetchedAt, changed, hash, bytes, result } = outcome;
+    const healthy = result.status === 'ok' || result.status === 'empty';
+    const prior = snapshots.get(spec.id);
+
+    try {
+      await db.insert(sourceSnapshots).values({
+        sourceId: spec.id,
+        contentHash: hash,
+        contentBytes: bytes,
+        lastFetchedAt: fetchedAt,
+        lastSuccessAt: healthy ? fetchedAt : prior?.lastSuccessAt ?? null,
+        lastChangedAt: changed ? fetchedAt : prior?.lastChangedAt ?? null,
+        lastStatus: result.status,
+        lastError: healthy ? null : result.detail,
+        consecutiveFailures: healthy ? 0 : (prior?.consecutiveFailures ?? 0) + 1,
+        eventsLastExtracted: result.events.length,
+        updatedAt: fetchedAt,
+      }).onConflictDoUpdate({
+        target: sourceSnapshots.sourceId,
+        set: {
+          contentHash: hash,
+          contentBytes: bytes,
+          lastFetchedAt: fetchedAt,
+          lastSuccessAt: healthy ? fetchedAt : prior?.lastSuccessAt ?? null,
+          lastChangedAt: changed ? fetchedAt : prior?.lastChangedAt ?? null,
+          lastStatus: result.status,
+          lastError: healthy ? null : result.detail,
+          consecutiveFailures: healthy ? 0 : (prior?.consecutiveFailures ?? 0) + 1,
+          eventsLastExtracted: result.events.length,
+          updatedAt: fetchedAt,
+        },
+      });
+    } catch (err) {
+      console.error(`[GHI Radar] Snapshot write failed for ${spec.id}:`, err);
+    }
+  }
+
   return {
     status: degraded.length > 0 ? 'degraded' : 'success',
     count: allEvents.length,
     inserted: insertedCount,
     skippedDuplicates: skippedCount,
+    checked: checkedCount,
+    unchanged: unchangedCount,
     cutoffDate: cutoff,
     sources: sourceStats,
     degraded,

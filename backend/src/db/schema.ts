@@ -98,8 +98,34 @@ export const surveillanceSources = pgTable("surveillance_sources", {
     lastFetchedAt: timestamp("last_fetched_at", { withTimezone: true }),
     status: varchar("status", { length: 50 }).default("active"),
     fetchIntervalHours: integer("fetch_interval_hours").default(2),
+    // How the collector retrieves this source, and which extractor parses it.
+    // Added by migrations/002_source_registry.mjs.
+    fetchStrategy: varchar("fetch_strategy", { length: 20 }).default("html").notNull(),
+    parserHint: varchar("parser_hint", { length: 60 }),
+    priorityBoost: integer("priority_boost").default(0).notNull(),
+    tags: jsonb("tags").default([]).notNull(),
+    config: jsonb("config").default({}).notNull(),
+    disabledReason: text("disabled_reason"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+
+// Last-seen content hash per source. This is the change detection: a scan
+// fetches, normalizes, hashes, and only extracts when the hash moved.
+// See migrations/002_source_registry.mjs.
+export const sourceSnapshots = pgTable("source_snapshots", {
+    sourceId: varchar("source_id", { length: 100 }).primaryKey()
+        .references(() => surveillanceSources.id, { onDelete: "cascade" }),
+    contentHash: text("content_hash"),
+    contentBytes: integer("content_bytes"),
+    lastFetchedAt: timestamp("last_fetched_at", { withTimezone: true }),
+    lastSuccessAt: timestamp("last_success_at", { withTimezone: true }),
+    lastChangedAt: timestamp("last_changed_at", { withTimezone: true }),
+    lastStatus: varchar("last_status", { length: 20 }).default("unknown").notNull(),
+    lastError: text("last_error"),
+    consecutiveFailures: integer("consecutive_failures").default(0).notNull(),
+    eventsLastExtracted: integer("events_last_extracted").default(0).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export const radarEvents = pgTable("radar_events", {

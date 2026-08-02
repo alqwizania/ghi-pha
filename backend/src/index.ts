@@ -4,7 +4,6 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from './db/schema';
 import { eq, desc, gte } from 'drizzle-orm';
-import { BeaconCollector } from './services/beacon-collector';
 import { sign, verify } from 'hono/jwt';
 
 type Bindings = {
@@ -478,14 +477,31 @@ import { fetchGlobalRadarScan, promoteRadarEventToSignal, MASTER_SOURCES, cutoff
 
 // --- GLOBAL RADAR ROUTES ---
 
+// Sources are returned with their persisted health, so the drawer shows real
+// state on load rather than only after the operator triggers a scan.
 app.get('/api/radar/sources', async (c) => {
     try {
         const dbClient = getDB(c.env);
-        const result = await dbClient.query.surveillanceSources.findMany();
-        if (result.length === 0) {
+        const sources = await dbClient.query.surveillanceSources.findMany();
+        if (sources.length === 0) {
             return c.json(MASTER_SOURCES);
         }
-        return c.json(result);
+        const snapshots = await dbClient.query.sourceSnapshots.findMany();
+        const health = new Map(snapshots.map((s: any) => [s.sourceId, s]));
+
+        return c.json(sources.map((s: any) => {
+            const snap: any = health.get(s.id);
+            return {
+                ...s,
+                lastFetchedAt: snap?.lastFetchedAt ?? null,
+                lastSuccessAt: snap?.lastSuccessAt ?? null,
+                lastChangedAt: snap?.lastChangedAt ?? null,
+                lastStatus: snap?.lastStatus ?? 'unknown',
+                lastError: snap?.lastError ?? null,
+                consecutiveFailures: snap?.consecutiveFailures ?? 0,
+                eventsLastExtracted: snap?.eventsLastExtracted ?? 0,
+            };
+        }));
     } catch {
         return c.json(MASTER_SOURCES);
     }
@@ -545,10 +561,12 @@ const handleRssFeed = async (c: any) => {
 app.get('/api/radar/rss', handleRssFeed);
 app.get('/api/v1/radar/rss', handleRssFeed);
 
+// An operator pressing Scan expects every source checked now, so a manual scan
+// bypasses the per-source interval. The 6-hourly cron does not.
 app.post('/api/radar/scan', async (c) => {
     try {
         const dbClient = getDB(c.env);
-        const result = await fetchGlobalRadarScan(dbClient);
+        const result = await fetchGlobalRadarScan(dbClient, c.env, { force: true });
         return c.json(result);
     } catch (e) {
         return c.json({ error: 'Scan failed', details: String(e) }, 500);
@@ -589,9 +607,7 @@ export default {
     fetch: app.fetch,
     async scheduled(event: any, env: Bindings, ctx: ExecutionContext) {
         const dbClient = getDB(env);
-        const collector = new BeaconCollector(dbClient);
-        ctx.waitUntil(collector.collect());
-        ctx.waitUntil(fetchGlobalRadarScan(dbClient));
+        ctx.waitUntil(fetchGlobalRadarScan(dbClient, env));
     },
 };
 

@@ -28,6 +28,45 @@ The **Global Health Intelligence (GHI) System** is an executive-grade health sur
 
 All mock/seed data has been replaced with a real-time HTTP ingestion engine located in [`backend/src/services/radar-collector.ts`](file:///d:/Vibecoding/GHI%20System/backend/src/services/radar-collector.ts).
 
+### How ingestion works
+
+Sources live in the `surveillance_sources` table, not in code — adding one is
+an insert. Each row carries a `fetch_strategy` (`json`, `rss`, `html`,
+`browser`) and a `parser_hint` naming the extractor in
+[`radar-collector.ts`](file:///d:/Vibecoding/GHI%20System/backend/src/services/radar-collector.ts).
+
+A scan **fetches, normalizes, hashes, and only extracts when the hash moved**
+since the last pass. `normalizeForHash` strips timestamps, nonces, session ids,
+and cache-busting query strings so cosmetic churn doesn't read as new content.
+The hash lives in `source_snapshots`. In practice about three quarters of
+sources are unchanged on any given scan and skip parsing entirely — this is
+what replaces a self-hosted ChangeDetection.io deployment.
+
+Requests are **serialized per host** with a short delay, so a scan never opens
+several connections to the same agency at once. Different hosts still run in
+parallel; a full 40-source pass takes roughly 20–50 seconds.
+
+A manual scan from the UI forces every source; the 6-hourly cron respects each
+source's `fetch_interval_hours`.
+
+### Registry status (2 Aug 2026)
+
+59 sources registered, **40 collecting**. A full scan yields events from
+~27 of them.
+
+### Sources awaiting Browser Rendering
+
+Six sources are reachable but return a page whose content is assembled
+client-side, so static extraction yields nothing. They are marked
+`fetch_strategy = 'browser'` and report that state rather than looking empty:
+**China CDC, Germany RKI, Japan MHLW, Italy Ministry of Health, Hong Kong CHP,
+and the WHO Mpox Shiny dashboard.**
+
+Enabling them needs three things: the `@cloudflare/puppeteer` package, a
+`[browser]` binding in `wrangler.toml`, and Browser Rendering enabled on the
+Cloudflare account. The dispatch point is `retrieveSource()` in
+`radar-collector.ts`.
+
 ### Live Ingestion Sources
 
 Verified against the live upstreams on **2 Aug 2026**. A scan returns a
@@ -276,6 +315,27 @@ cd backend
 node migrations/001_radar_events_unique.mjs           # report only
 node migrations/001_radar_events_unique.mjs --apply   # execute
 ```
+
+**005 — CDC egress workaround (applied 2 Aug 2026).** `www.cdc.gov` returns
+HTTP 403 to Cloudflare Workers egress — verified with and without a browser
+User-Agent, and with requests serialized per host. `tools.cdc.gov` is
+unaffected. CDC now reads the newsroom RSS feed there; the two CDC pages with
+no feed equivalent are disabled with the reason recorded.
+
+**004 — source corrections (applied 2 Aug 2026).** Fixed two stale manifest
+URLs (WHO SEARO, UK Health Protection Reports) and marked six sources as
+requiring browser rendering — evidenced by the first full scan rather than
+assumed. See "Sources awaiting Browser Rendering" below.
+
+**003 — merged source registry (applied 2 Aug 2026).** Seeded 59 sources by
+reconciling the inherited 42-source manifest with GHI's verified fetchers.
+Where both describe the same agency, GHI's verified URL wins. Seven legacy
+entries from the old hardcoded seeding were retired in place rather than
+deleted, because radar_events rows still reference them.
+
+**002 — registry-driven ingestion (applied 2 Aug 2026).** Added fetch strategy,
+parser hint, priority, tags, and config columns to `surveillance_sources`, plus
+the `source_snapshots` table holding the last content hash per source.
 
 **001 — radar_events uniqueness (applied 2 Aug 2026).** Removed 63 duplicate
 rows (136 → 73), added a generated `content_hash` column

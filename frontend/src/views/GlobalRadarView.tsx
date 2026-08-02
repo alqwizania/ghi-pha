@@ -63,6 +63,16 @@ interface RadarSource {
   type: string;
   url: string;
   category?: string;
+  enabled?: boolean;
+  disabledReason?: string | null;
+  // Persisted per-source health, written by every scan. Present on load, so
+  // the drawer reports real state without the operator triggering a scan.
+  lastFetchedAt?: string | null;
+  lastChangedAt?: string | null;
+  lastStatus?: string;
+  lastError?: string | null;
+  consecutiveFailures?: number;
+  eventsLastExtracted?: number;
 }
 
 export default function GlobalRadarView({ onPromoteToTriage }: GlobalRadarViewProps) {
@@ -186,14 +196,22 @@ export default function GlobalRadarView({ onPromoteToTriage }: GlobalRadarViewPr
     }
   };
 
-  // Health of a source as of the most recent scan in this session. Without a
-  // scan we report 'unknown' rather than implying the feed is healthy.
-  const sourceHealth = (sourceId: string): 'live' | 'quiet' | 'down' | 'unknown' => {
-    if (!scanResult) return 'unknown';
-    if (scanResult.degraded.includes(sourceId)) return 'down';
-    if ((scanResult.sources?.[sourceId] ?? 0) > 0) return 'live';
-    if (scanResult.diagnostics[sourceId]) return 'quiet';
-    return 'unknown';
+  // Health prefers the current scan's result, then falls back to the health
+  // persisted alongside the source, so the drawer is meaningful on first load
+  // rather than only after the operator triggers a scan.
+  const sourceHealth = (src: RadarSource): 'live' | 'quiet' | 'down' | 'off' | 'unknown' => {
+    if (src.enabled === false) return 'off';
+
+    if (scanResult) {
+      if (scanResult.degraded.includes(src.id)) return 'down';
+      if ((scanResult.sources?.[src.id] ?? 0) > 0) return 'live';
+      if (scanResult.diagnostics[src.id]) return 'quiet';
+    }
+
+    if (!src.lastFetchedAt) return 'unknown';
+    if ((src.consecutiveFailures ?? 0) > 0) return 'down';
+    if ((src.eventsLastExtracted ?? 0) > 0) return 'live';
+    return 'quiet';
   };
 
   const cutoffLabel = scanResult?.cutoffDate
@@ -204,7 +222,8 @@ export default function GlobalRadarView({ onPromoteToTriage }: GlobalRadarViewPr
     live: { dot: 'bg-ghi-success shadow-[0_0_6px_#39FF14]', label: 'Live' },
     quiet: { dot: 'bg-ghi-warning shadow-[0_0_6px_#F4B400]', label: 'No new items' },
     down: { dot: 'bg-ghi-critical shadow-[0_0_6px_#FF3131]', label: 'Unavailable' },
-    unknown: { dot: 'bg-slate-600', label: 'Not yet scanned' },
+    off: { dot: 'bg-slate-600', label: 'Not collecting' },
+    unknown: { dot: 'bg-slate-700', label: 'Not yet scanned' },
   };
 
   const fetchRadarData = async () => {
@@ -562,7 +581,7 @@ export default function GlobalRadarView({ onPromoteToTriage }: GlobalRadarViewPr
             <div className="flex items-center gap-2">
               <Radio className="w-4 h-4 text-ghi-teal animate-pulse" />
               <h3 className="text-xs font-black text-white uppercase tracking-wider">
-                {sources.length} Global Sources Status
+                {sources.filter((s) => s.enabled !== false).length} of {sources.length} Sources Collecting
               </h3>
             </div>
             <button onClick={() => setIsSourcesOpen(false)} className="text-slate-400 hover:text-white">
@@ -570,21 +589,21 @@ export default function GlobalRadarView({ onPromoteToTriage }: GlobalRadarViewPr
             </button>
           </div>
 
-          {!scanResult && (
+          {!scanResult && sources.every((s) => !s.lastFetchedAt) && (
             <p className="text-[9px] text-slate-400 font-bold mb-2 shrink-0">
-              Run a scan to check feed health — status below is unverified.
+              No collection has run yet — statuses below are unverified.
             </p>
           )}
 
           <div className="grid grid-cols-2 gap-2 overflow-y-auto pr-1 flex-1">
             {sources.map((src) => {
-              const health = sourceHealth(src.id);
+              const health = sourceHealth(src);
               const style = HEALTH_STYLES[health];
               return (
                 <div
                   key={src.id}
                   className="p-2 rounded-xl bg-white/[0.03] border border-white/5 flex items-center justify-between gap-2"
-                  title={scanResult?.diagnostics[src.id] || style.label}
+                  title={scanResult?.diagnostics[src.id] || src.disabledReason || src.lastError || style.label}
                 >
                   <div className="min-w-0">
                     <p className="text-xs font-bold text-white truncate">{src.name}</p>
