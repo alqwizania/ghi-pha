@@ -97,6 +97,24 @@ Extract only what the source text actually states. Do not infer case counts, dat
 
 Mark isOutbreakEvent false for anything that is not a specific health event: site navigation, menus, cookie or privacy notices, search boxes, pagination, generic landing-page copy, job vacancies, conference announcements, and funding or administrative news. These appear frequently in scraped page content and must not become surveillance signals.`;
 
+/**
+ * Keeps only the most recent items of a feed. CDC's newsroom RSS carries 1,835
+ * entries; asking for an event per entry overran the output token ceiling and
+ * came back as truncated JSON. Feeds are ordered newest-first and anything
+ * older than the retrospective window is discarded downstream anyway, so
+ * trimming here costs no signal.
+ */
+export function trimFeedItems(xml: string, maxItems = 40): string {
+    const opens = [...xml.matchAll(/<item[\s>]/gi)];
+    if (opens.length <= maxItems) return xml;
+
+    const cutFrom = opens[maxItems].index;
+    if (cutFrom === undefined) return xml;
+
+    const closingTag = xml.lastIndexOf('</channel>') >= 0 ? '</channel></rss>' : '';
+    return `${xml.slice(0, cutFrom)}${closingTag}`;
+}
+
 /** Reduces an HTML page to readable text so the model reads content, not markup. */
 export function htmlToText(html: string, maxChars = 40000): string {
     const text = html
@@ -146,7 +164,7 @@ export async function extractEvents(
         return { events: [], status: 'no_key', detail: 'ANTHROPIC_API_KEY is not configured' };
     }
 
-    const content = isHtml ? htmlToText(rawContent) : rawContent.slice(0, 40000);
+    const content = isHtml ? htmlToText(rawContent) : trimFeedItems(rawContent).slice(0, 40000);
     if (content.trim().length < 40) {
         return { events: [], status: 'ok', detail: 'source content was empty after cleaning' };
     }
@@ -180,6 +198,19 @@ export async function extractEvents(
                 events: [],
                 status: 'refusal',
                 detail: `Extraction declined by safety classifier for ${source.id}`,
+            };
+        }
+
+        // A truncated response is not a model failure and should not be reported
+        // as a parse error — the JSON is valid up to the cut, it just ends
+        // mid-string. Say so plainly so the fix is obvious.
+        if (response.stop_reason === 'max_tokens') {
+            return {
+                events: [],
+                status: 'error',
+                detail: `Output truncated at max_tokens for ${source.id}; the source has more items than one response can carry`,
+                inputTokens: response.usage?.input_tokens,
+                outputTokens: response.usage?.output_tokens,
             };
         }
 

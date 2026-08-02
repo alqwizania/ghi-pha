@@ -54,11 +54,22 @@ source's `fetch_interval_hours`.
 59 sources registered, **40 collecting**. A full scan yields events from
 ~27 of them.
 
-### Structured extraction (pilot)
+### ⚠️ Known limit: a forced full scan takes ~5 minutes
 
-Four sources — **ECDC, WHO AFRO, UK UKHSA, WHO EMRO MERS** — are set to
-`parser_hint = 'ai'` and route their content through Claude with a fixed
-extraction schema
+The 6-hourly cron is fine — it only fetches sources whose interval has elapsed
+and only extracts the ones whose content hash moved, so a normal run handles a
+handful of sources. **The manual Scan button forces every source**, and when
+many need extraction that takes around five minutes in one HTTP request.
+
+That is longer than a Worker request should hold open. The fix is the queue
+split from the architecture plan: a fetch queue and an extract queue, so each
+source is an independent message. Until that lands, avoid pressing Scan
+immediately after a config change that clears many hashes at once.
+
+### Structured extraction
+
+**32 of the 40 collecting sources** use `parser_hint = 'ai'` and route their
+content through Claude with a fixed extraction schema
 ([`event-extractor.ts`](file:///d:/Vibecoding/GHI%20System/backend/src/services/event-extractor.ts)).
 
 This exists because the title scraper cannot tell an outbreak headline from
@@ -89,11 +100,24 @@ Locally, add `ANTHROPIC_API_KEY="sk-ant-..."` to `backend/.dev.vars`. Without a
 key these four sources fall back to the legacy extractor rather than failing,
 and the scan banner reports that they ran degraded.
 
-⚠️ **The model call itself has not yet been executed against the live API** —
-no key was available during development. The request shape compiles against the
-Anthropic SDK's own types with no casts, and the fallback path is verified, but
-the first real extraction should be reviewed against what an analyst would have
-recorded before the remaining sources are switched over.
+**Not switched, deliberately:** `WHO_DONS` and `WHO_MPX_API` keep their
+purpose-built JSON parsers, which read the APIs' own fields — more accurate
+than extraction and free.
+
+**Measured cost:** about **$0.04 per HTML page** and **$0.14 per RSS feed** (a
+feed carries many items, and generating one event per item is output-token
+heavy). Extraction only runs when a page's hash moved, so spend tracks how
+often these agencies publish rather than how often the cron fires.
+
+Effort is left at the default. Dropping it to `low` cut cost 27% but stopped
+splitting multi-country outbreaks into one row per country and dropped the
+Saudi-Arabia-specific MERS figures in favour of the global total — the most
+valuable row on that page for this authority. Not worth the saving.
+
+**Two known false positives** worth a prompt tweak if they bother analysts: a
+Czech hospital-preparedness feature was recorded as an Ebola event in Czechia,
+and UKHSA's "Yellow heat health alerts" is captured as an event with disease
+"Unspecified". Whether heat alerts belong in the triage queue is a domain call.
 
 ### Sources awaiting Browser Rendering
 
