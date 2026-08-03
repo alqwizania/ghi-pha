@@ -60,6 +60,9 @@ try {
         disease: e.disease, country: e.country, cases: e.cases, deaths: e.deaths,
         title: e.title, summary: e.summary ?? '', dateReported: e.date_reported,
         sourceId: e.source_id ?? '',
+        indicators: e.indicators ?? undefined,
+        countBasis: e.count_basis ?? 'unknown',
+        countPeriod: e.count_period,
       },
       baselines
     );

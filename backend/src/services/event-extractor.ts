@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import type { EpiIndicators } from './signal-scoring';
+import type { CountBasis, EpiIndicators } from './signal-scoring';
 
 /**
  * Structured extraction of outbreak events from raw source content.
@@ -22,6 +22,10 @@ export interface ExtractedEvent {
     dateReported: string | null;
     cases: number | null;
     deaths: number | null;
+    /** What span the counts cover. See CountBasis — scoring depends on this. */
+    countBasis?: CountBasis;
+    /** The reporting window as the source words it, e.g. "since 2012", "week 31". */
+    countPeriod?: string | null;
     summary: string;
     url: string | null;
     isOutbreakEvent: boolean;
@@ -70,6 +74,17 @@ const EXTRACTION_SCHEMA = {
                         type: ['integer', 'null'],
                         description: 'Reported deaths if stated. Null if not stated. Never estimate.',
                     },
+                    countBasis: {
+                        type: 'string',
+                        enum: ['outbreak_to_date', 'period', 'historical_cumulative', 'unknown'],
+                        description:
+                            'What span the case and death numbers cover. "outbreak_to_date" = the running total for THIS outbreak or event since it began. "period" = cases occurring within a stated reporting window such as a week, month, or year. "historical_cumulative" = an all-time or multi-year surveillance total that is not tied to a current outbreak, e.g. "2,226 cases reported globally since 2012". "unknown" if the text does not make it clear. Use "unknown" rather than guessing.',
+                    },
+                    countPeriod: {
+                        type: ['string', 'null'],
+                        description:
+                            'The reporting window exactly as the source words it, e.g. "since 2012", "epidemiological week 31", "1 January to 30 June 2026". Null if the source states no window. Max 80 characters.',
+                    },
                     summary: {
                         type: 'string',
                         description: 'One or two sentences describing what happened, drawn only from the source text. Max 400 characters.',
@@ -107,7 +122,7 @@ const EXTRACTION_SCHEMA = {
                         additionalProperties: false,
                     },
                 },
-                required: ['title', 'disease', 'country', 'dateReported', 'cases', 'deaths', 'summary', 'url', 'isOutbreakEvent', 'indicators'],
+                required: ['title', 'disease', 'country', 'dateReported', 'cases', 'deaths', 'countBasis', 'countPeriod', 'summary', 'url', 'isOutbreakEvent', 'indicators'],
                 additionalProperties: false,
             },
         },
@@ -119,6 +134,8 @@ const EXTRACTION_SCHEMA = {
 const SYSTEM_PROMPT = `You extract disease outbreak events from public health agency web pages and feeds for a national health authority's surveillance system.
 
 Extract only what the source text actually states. Do not infer case counts, dates, or countries that are not written on the page, and never estimate a number — report null instead. If a page contains no disease events at all, return an empty array; that is a correct and expected answer, not a failure.
+
+Case and death numbers are meaningless without knowing what span they cover, so countBasis matters as much as the numbers themselves. WHO's MERS page reports 2,226 cases in Saudi Arabia since 2012; read as new cases that would look like a national emergency, read correctly it is fourteen years of routine surveillance. Set countBasis to historical_cumulative whenever the total spans years or is described as a running global or national tally, and to outbreak_to_date only when the figure belongs to one identifiable current event.
 
 Mark isOutbreakEvent false for anything that is not a specific health event: site navigation, menus, cookie or privacy notices, search boxes, pagination, generic landing-page copy, job vacancies, conference announcements, and funding or administrative news. These appear frequently in scraped page content and must not become surveillance signals.`;
 
@@ -138,6 +155,28 @@ export function trimFeedItems(xml: string, maxItems = 40): string {
 
     const closingTag = xml.lastIndexOf('</channel>') >= 0 ? '</channel></rss>' : '';
     return `${xml.slice(0, cutFrom)}${closingTag}`;
+}
+
+/**
+ * Splits content into two halves for a retry after a truncated response.
+ *
+ * Feeds split on an item boundary so neither half cuts an entry down the
+ * middle; anything else splits on the nearest newline. The halves are fed to
+ * the model as text and never parsed as XML, so a missing wrapper element does
+ * not matter — what matters is that no entry is destroyed by the cut.
+ */
+export function splitContent(content: string): [string, string] | null {
+    const opens = [...content.matchAll(/<item[\s>]/gi)];
+    if (opens.length >= 4) {
+        const cut = opens[Math.floor(opens.length / 2)].index;
+        if (cut !== undefined) return [content.slice(0, cut), content.slice(cut)];
+    }
+
+    if (content.length < 2000) return null;
+    const mid = Math.floor(content.length / 2);
+    const boundary = content.indexOf('\n', mid);
+    const cut = boundary === -1 ? mid : boundary;
+    return [content.slice(0, cut), content.slice(cut)];
 }
 
 /** Reduces an HTML page to readable text so the model reads content, not markup. */
@@ -194,6 +233,28 @@ export async function extractEvents(
         return { events: [], status: 'ok', detail: 'source content was empty after cleaning' };
     }
 
+    return extractFromContent(apiKey, source, content, 0);
+}
+
+/** How many times a truncated response may be halved and retried. */
+const MAX_SPLIT_DEPTH = 2;
+
+/**
+ * One extraction attempt, halving and retrying if the response is truncated.
+ *
+ * Raising max_tokens alone only moves the cliff — CDC's newsroom feed is
+ * event-dense enough that some pass will always overrun it, and a source that
+ * silently drops its content on a busy week is worse than one that costs an
+ * extra call. Splitting bounds the work instead: at most four requests, and the
+ * failure mode becomes "more requests" rather than "no events".
+ */
+async function extractFromContent(
+    apiKey: string,
+    source: { id: string; name: string; url: string },
+    content: string,
+    depth: number
+): Promise<ExtractionOutcome> {
+
     const client = new Anthropic({ apiKey });
 
     try {
@@ -230,12 +291,34 @@ export async function extractEvents(
         // as a parse error — the JSON is valid up to the cut, it just ends
         // mid-string. Say so plainly so the fix is obvious.
         if (response.stop_reason === 'max_tokens') {
+            const halves = depth < MAX_SPLIT_DEPTH ? splitContent(content) : null;
+            if (!halves) {
+                return {
+                    events: [],
+                    status: 'error',
+                    detail: `Output truncated at max_tokens for ${source.id} and the content could not be split further`,
+                    inputTokens: response.usage?.input_tokens,
+                    outputTokens: response.usage?.output_tokens,
+                };
+            }
+
+            const [first, second] = await Promise.all([
+                extractFromContent(apiKey, source, halves[0], depth + 1),
+                extractFromContent(apiKey, source, halves[1], depth + 1),
+            ]);
+
+            // A half that fails does not discard the half that worked; the
+            // partial result is reported with the reason it is partial.
+            const events = [...first.events, ...second.events];
+            const failed = [first, second].filter((r) => r.status !== 'ok');
             return {
-                events: [],
-                status: 'error',
-                detail: `Output truncated at max_tokens for ${source.id}; the source has more items than one response can carry`,
-                inputTokens: response.usage?.input_tokens,
-                outputTokens: response.usage?.output_tokens,
+                events,
+                status: failed.length === 2 ? 'error' : 'ok',
+                detail: failed.length
+                    ? `Split after truncation; ${failed.length} of 2 halves failed (${failed.map((f) => f.detail).join('; ')})`
+                    : `Split after truncation into 2 halves`,
+                inputTokens: (first.inputTokens ?? 0) + (second.inputTokens ?? 0),
+                outputTokens: (first.outputTokens ?? 0) + (second.outputTokens ?? 0),
             };
         }
 

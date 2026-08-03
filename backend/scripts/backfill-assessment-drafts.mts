@@ -43,13 +43,14 @@ try {
     SELECT
       a.id, a.ihr_question_1, a.rra_hazard_assessment,
       s.disease, s.country, s.cases, s.deaths, s.source_name, s.date_reported,
-      s.raw_data,
+      s.raw_data, re.count_basis, re.count_period,
       es.severity, es.unusualness, es.spread, es.trade_travel, es.ksa_relevance,
       es.domains_at_two, es.tier, es.mandatory_ihr, es.confidence, es.evidence,
       es.reports_occurrence
     FROM assessments a
     JOIN signals s ON s.id = a.signal_id
     LEFT JOIN event_scores es ON es.radar_event_id = s.radar_event_id
+    LEFT JOIN radar_events re ON re.id = s.radar_event_id
     WHERE a.machine_draft IS NULL
     ORDER BY a.created_at DESC
   `;
@@ -109,6 +110,8 @@ try {
       deaths: r.deaths,
       sourceName: r.source_name,
       dateReported: isoDate(r.date_reported),
+      countBasis: r.count_basis,
+      countPeriod: r.count_period,
       score: scoreFromRow(source as any),
     });
 

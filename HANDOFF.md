@@ -433,6 +433,87 @@ count, and among them were "measles outbreak in Delaware" and an Ebola
 escalation. The first report of an outbreak almost never has a number, and that
 is exactly the signal worth having. Currently 53 actionable of 111 total.
 
+## 🔧 Four silent data-loss bugs (fixed 3 Aug 2026)
+
+All four had the same shape: code that looked wired up, ran without error, and
+threw away facts the system had already paid to obtain. None produced a log
+line. Found by tracing one wrong number — the MERS row — back to its source.
+
+**1. Indicators never reached the scorer.** The extractor read ten
+epidemiological booleans off every source — novel pathogen, healthcare-worker
+infections, human-to-human transmission — and the collector carried them to an
+insert that had no column for them. Scoring then re-read the row from the
+database. Every indicator rule was dead code for the life of the feature.
+
+These are the strongest rules in the model: novel pathogen sets unusualness to 3
+on its own, healthcare-worker infection sets spread to 3 as a sentinel for
+sustained transmission. Without them, spread was decided almost entirely by the
+baseline transmission route, and novelty — the single best PHEIC predictor —
+never fired at all.
+
+**2. Counts had no reporting period.** WHO's MERS page reports 2,226 cases in
+Saudi Arabia since 2012. Compared against an expected annual total that reads as
+11.1x the yearly burden, and the Kingdom's routine surveillance page came out
+Critical. `count_basis` now records what the numbers cover, and
+`historical_cumulative` counts are excluded from the magnitude rules entirely
+rather than discounted by an invented factor. Live extraction confirms the
+model reads these correctly: GPEI returns "2026 (year to date)", UKHSA "7 days
+up to 22 Jul 2026".
+
+**3. Re-reports were discarded.** `ON CONFLICT DO NOTHING` on (source, title)
+meant that when a source republished one headline with revised figures — which
+is exactly how WHO reports an evolving outbreak — the update was dropped and the
+event stayed frozen at whatever the first scan caught. Now an upsert, with
+`radar_events.updated_at` so the scoring pass re-scores what changed instead of
+only ever looking at unscored events. Promotion state is deliberately excluded
+from the upsert: re-reporting must not resurrect something an analyst has dealt
+with.
+
+**4. A failed extraction locked a source out permanently.** The content hash was
+stored even when extraction failed, so the next scan saw "already handled" and
+skipped the source — including on forced scans, while reporting itself as merely
+unchanged. CDC hit one truncated response and went silent. **22 of 40 sources
+were holding a hash written by a failing pass.** A failure now leaves the
+previous hash in place so the next scan retries.
+
+### CDC: split-and-retry instead of a bigger ceiling
+
+CDC's newsroom feed is event-dense enough to overrun any fixed `max_tokens`, so
+raising the ceiling only moves the cliff. A truncated response is now halved on
+an item boundary and retried, to a depth of 2 — at most four requests, and the
+failure mode becomes "more requests" rather than "no events". A half that fails
+does not discard the half that worked.
+
+CDC went from contributing nothing to yielding a 1,644-case Cyclospora outbreak,
+Ebola in DRC, a Listeria outbreak and infant botulism.
+
+### Regression checks
+
+`npx tsx scripts/verify-scoring.mts` — 22 assertions over pure functions, no
+database or API key. It exists because this bug class is invisible: nothing
+failed, nothing logged, and the scores looked reasonable. The only way to catch
+it is to assert that a given input produces a given score.
+
+`npx tsx scripts/run-scan.mts [--force]` runs a full scan from Node. A forced
+scan takes longer than `wrangler dev` holds a connection open, so Miniflare
+restarts the worker mid-request and the scan is lost — this drives the same
+code against the same database without that limit.
+
+### Result
+
+Auto-promoted queue went from 7 to 10, all genuine: WPV1 Pakistan, cVDPV1 in
+Laos and South Sudan, cVDPV2 in DRC, meningococcal disease in Sudan, MERS-CoV
+Saudi Arabia, H5N1 Egypt, measles Uganda, cholera Yemen. Source health is 31 ok
+/ 3 empty / 2 http_error / 6 blocked on Browser Rendering.
+
+**Coverage caveat:** only 15 of 127 events carry indicators and 8 carry a real
+count basis, because the fields are populated at extraction and most stored
+events predate the change. Their sources will not re-serve items that have
+scrolled off. Existing rows keep `count_basis = 'unknown'`, which scores as
+current, so nothing goes quiet — but the MERS row itself stays at 2,226 until
+WHO EMRO republishes it. WHO_EMRO_MERS currently extracts empty and is worth a
+look.
+
 ## 🧾 Automated Assessment (Phase 4 — done, 3 Aug 2026)
 
 Accepting a signal in triage now opens a **completed** IHR Annex 2 answer set
@@ -604,6 +685,12 @@ cd backend
 node migrations/001_radar_events_unique.mjs           # report only
 node migrations/001_radar_events_unique.mjs --apply   # execute
 ```
+
+**015 — count basis and indicators (applied 3 Aug 2026).** Added
+`radar_events.count_basis`, `count_period`, `indicators` and `updated_at`, and
+cleared `event_scores` so everything recomputes. Scorer version moved to
+`ihr-annex2-v2`. Re-run scoring with
+`npx tsx scripts/backfill-scores.mts --apply`, or just run a scan.
 
 **014 — machine assessment (applied 3 Aug 2026).** Added `machine_draft` and its
 provenance columns plus `human_reviewed_at` to `assessments`, and widened

@@ -40,11 +40,13 @@ function isoDate(value: unknown): string | null {
 try {
   const rows = await sql`
     SELECT s.disease, s.country, s.cases, s.deaths, s.source_name, s.date_reported,
+           re.count_basis, re.count_period,
            es.severity, es.unusualness, es.spread, es.trade_travel, es.ksa_relevance,
            es.domains_at_two, es.tier, es.mandatory_ihr, es.confidence, es.evidence,
            es.reports_occurrence
     FROM signals s
     JOIN event_scores es ON es.radar_event_id = s.radar_event_id
+    JOIN radar_events re ON re.id = s.radar_event_id
     WHERE s.triage_status = 'Pending Triage'
     ORDER BY
       CASE es.tier WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'moderate' THEN 2 ELSE 3 END,
@@ -62,6 +64,8 @@ try {
       deaths: r.deaths,
       sourceName: r.source_name,
       dateReported: isoDate(r.date_reported),
+      countBasis: r.count_basis,
+      countPeriod: r.count_period,
       score: scoreFromRow({
         severity: r.severity, unusualness: r.unusualness, spread: r.spread,
         tradeTravel: r.trade_travel, ksaRelevance: r.ksa_relevance,

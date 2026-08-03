@@ -1,6 +1,6 @@
 import { surveillanceSources, sourceSnapshots, radarEvents, signals, eventScores, signalLinks } from '../db/schema';
-import { scoreEvent, shouldAutoPromote, SCORER_VERSION, type DiseaseBaseline, type EpiIndicators, type ScoreResult } from './signal-scoring';
-import { eq, and, gte, isNull } from 'drizzle-orm';
+import { scoreEvent, shouldAutoPromote, SCORER_VERSION, type CountBasis, type DiseaseBaseline, type EpiIndicators, type ScoreResult } from './signal-scoring';
+import { eq, and, gte, gt, isNull, or } from 'drizzle-orm';
 import { extractEvents } from './event-extractor';
 
 // ============================================================
@@ -385,6 +385,9 @@ interface ParsedEvent {
   riskLevel: string;
   /** Present only for model-extracted events; feeds deterministic scoring. */
   indicators?: EpiIndicators;
+  /** What span the counts cover. Absent on legacy fetchers; treated as unknown. */
+  countBasis?: CountBasis;
+  countPeriod?: string | null;
 }
 
 // ============================================================
@@ -738,6 +741,8 @@ async function parseWithModel(
       // without appealing to the model's judgement.
       riskLevel: classifyRisk(`${e.title} ${e.summary}`, cases, deaths),
       indicators: e.indicators,
+      countBasis: e.countBasis ?? 'unknown',
+      countPeriod: e.countPeriod ? e.countPeriod.substring(0, 80) : null,
     });
   }
 
@@ -969,12 +974,38 @@ export async function fetchGlobalRadarScan(db?: any, env?: any, options: { force
             cases: evt.cases,
             deaths: evt.deaths,
             cfr: evt.cfr,
+            countBasis: evt.countBasis ?? 'unknown',
+            countPeriod: evt.countPeriod ?? null,
+            indicators: evt.indicators ?? null,
             summary: evt.summary,
             sourceUrl: evt.sourceUrl,
             boardType: evt.boardType,
             riskLevel: evt.riskLevel,
             isPromoted: false
-          }).onConflictDoNothing();
+          }).onConflictDoUpdate({
+            // Sources republish the same headline with revised figures — WHO's
+            // MERS page carries one title and a new total every month. Ignoring
+            // the conflict meant every such update was discarded and the event
+            // stayed frozen at whatever the first scan happened to catch.
+            //
+            // Promotion state is deliberately absent from the set: an event
+            // already in triage stays in triage, and re-reporting must not
+            // resurrect something an analyst has dealt with.
+            target: radarEvents.contentHash,
+            set: {
+              cases: evt.cases,
+              deaths: evt.deaths,
+              cfr: evt.cfr,
+              dateReported: evt.dateReported,
+              summary: evt.summary,
+              riskLevel: evt.riskLevel,
+              countBasis: evt.countBasis ?? 'unknown',
+              countPeriod: evt.countPeriod ?? null,
+              indicators: evt.indicators ?? null,
+              sourceUrl: evt.sourceUrl,
+              updatedAt: new Date(),
+            },
+          });
           inserted++;
         }
       } catch (err) {
@@ -1009,10 +1040,20 @@ export async function fetchGlobalRadarScan(db?: any, env?: any, options: { force
     const healthy = result.status === 'ok' || result.status === 'empty';
     const prior = snapshots.get(spec.id);
 
+    // Only a successful pass may claim this content as seen.
+    //
+    // The hash is the change-detection state: storing it after a failed
+    // extraction tells the next scan "already handled", and the source then
+    // stays silent until its page happens to change. CDC failed once on a
+    // truncated response and was skipped on every subsequent scan, including
+    // forced ones, while reporting itself as merely unchanged. A failure must
+    // leave the previous hash in place so the next pass retries.
+    const hashToStore = healthy ? hash : prior?.contentHash ?? null;
+
     try {
       await db.insert(sourceSnapshots).values({
         sourceId: spec.id,
-        contentHash: hash,
+        contentHash: hashToStore,
         contentBytes: bytes,
         lastFetchedAt: fetchedAt,
         lastSuccessAt: healthy ? fetchedAt : prior?.lastSuccessAt ?? null,
@@ -1025,7 +1066,7 @@ export async function fetchGlobalRadarScan(db?: any, env?: any, options: { force
       }).onConflictDoUpdate({
         target: sourceSnapshots.sourceId,
         set: {
-          contentHash: hash,
+          contentHash: hashToStore,
           contentBytes: bytes,
           lastFetchedAt: fetchedAt,
           lastSuccessAt: healthy ? fetchedAt : prior?.lastSuccessAt ?? null,
@@ -1099,11 +1140,17 @@ export async function scoreAndPromotePending(
     ihrAssessAlways: b.ihrAssessAlways,
   }));
 
+  // Unscored events, plus events a re-report has revised since they were last
+  // scored. Without the second clause an outbreak's score would be frozen at
+  // whatever the first scan caught, however far the figures moved afterwards.
   const pending = await db
     .select()
     .from(radarEvents)
     .leftJoin(eventScores, eq(eventScores.radarEventId, radarEvents.id))
-    .where(isNull(eventScores.radarEventId))
+    .where(or(
+      isNull(eventScores.radarEventId),
+      gt(radarEvents.updatedAt, eventScores.scoredAt)
+    ))
     .limit(limit);
 
   let scored = 0;
@@ -1123,6 +1170,13 @@ export async function scoreAndPromotePending(
           summary: evt.summary ?? '',
           dateReported: evt.dateReported,
           sourceId: evt.sourceId ?? '',
+          // Read back from the row rather than carried in memory: scoring runs
+          // as its own pass over unscored events, so anything the extractor
+          // found has to survive the insert to reach it. Before migration 015
+          // it did not, and every indicator rule was dead.
+          indicators: (evt.indicators ?? undefined) as EpiIndicators | undefined,
+          countBasis: (evt.countBasis ?? 'unknown') as CountBasis,
+          countPeriod: evt.countPeriod,
         },
         baselines
       );
@@ -1147,7 +1201,33 @@ export async function scoreAndPromotePending(
           ksaRelevance: result.ksaRelevance.reasons,
         },
         scorerVersion: SCORER_VERSION,
-      }).onConflictDoNothing();
+      }).onConflictDoUpdate({
+        // A re-scored event replaces its score rather than keeping the stale
+        // one. The evidence goes with it, so what an analyst reads always
+        // matches the figures the event currently holds.
+        target: eventScores.radarEventId,
+        set: {
+          severity: result.severity.score,
+          unusualness: result.unusualness.score,
+          spread: result.spread.score,
+          tradeTravel: result.tradeTravel.score,
+          ksaRelevance: result.ksaRelevance.score,
+          domainsAtTwo: result.domainsAtTwo,
+          tier: result.tier,
+          mandatoryIhr: result.mandatoryIhr,
+          confidence: result.confidence,
+          reportsOccurrence: result.reportsOccurrence,
+          evidence: {
+            severity: result.severity.reasons,
+            unusualness: result.unusualness.reasons,
+            spread: result.spread.reasons,
+            tradeTravel: result.tradeTravel.reasons,
+            ksaRelevance: result.ksaRelevance.reasons,
+          },
+          scorerVersion: SCORER_VERSION,
+          scoredAt: new Date(),
+        },
+      });
       scored++;
 
       if (shouldAutoPromote(result)) {

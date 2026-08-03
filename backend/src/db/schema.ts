@@ -157,6 +157,18 @@ export const radarEvents = pgTable("radar_events", {
     cases: integer("cases").default(0),
     deaths: integer("deaths").default(0),
     cfr: numeric("cfr", { precision: 5, scale: 2 }),
+    // What span `cases` and `deaths` cover. A multi-year running total is not an
+    // anomaly, so scoring excludes historical_cumulative counts from the
+    // magnitude rules. Added by migration 015.
+    countBasis: varchar("count_basis", { length: 24 }).default("unknown"),
+    countPeriod: varchar("count_period", { length: 80 }),
+    // The ten epidemiological booleans the extractor reads off the source. These
+    // were collected and then dropped for want of a column, which made every
+    // indicator-driven scoring rule dead code. See migration 015.
+    indicators: jsonb("indicators"),
+    // Bumped whenever a re-report revises this event's facts. Scoring compares
+    // it against event_scores.scored_at to find events whose score went stale.
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
     summary: text("summary"),
     sourceUrl: text("source_url").notNull(),
     boardType: varchar("board_type", { length: 50 }).default("biological"),

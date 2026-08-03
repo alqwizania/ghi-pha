@@ -25,7 +25,7 @@
  * withholding a starting point from the moderate ones only creates blank forms.
  */
 
-import { SCORER_VERSION, type DomainScore, type ScoreResult } from './signal-scoring';
+import { SCORER_VERSION, type CountBasis, type DomainScore, type ScoreResult } from './signal-scoring';
 
 export const DRAFTER_VERSION = 'ihr-annex2-draft-v1';
 
@@ -38,6 +38,9 @@ export interface DraftInput {
     dateReported: string | null;
     score: ScoreResult;
     scorerVersion?: string;
+    /** What span the counts cover, surfaced to the analyst as an uncertainty. */
+    countBasis?: CountBasis;
+    countPeriod?: string | null;
 }
 
 export interface MachineDraft {
@@ -111,13 +114,33 @@ function note(domain: DomainScore, yes: boolean, whenSilent: string): string {
     return `Below the Annex 2 threshold on the reported information. ${sentences(domain.reasons)}`;
 }
 
-function burden(cases: number | null, deaths: number | null): string {
-    const c = cases ?? 0;
-    const d = deaths ?? 0;
-    if (c > 0 && d > 0) return `${c} case${c === 1 ? '' : 's'} and ${d} death${d === 1 ? '' : 's'} reported`;
-    if (c > 0) return `${c} case${c === 1 ? '' : 's'} reported, no deaths stated`;
-    if (d > 0) return `${d} death${d === 1 ? '' : 's'} reported, case count not stated`;
-    return 'no case or death counts given in the source report';
+/**
+ * The burden sentence, qualified by what the counts actually cover. An
+ * unqualified "2,226 cases and 869 deaths" is the misleading half of the MERS
+ * problem even once scoring has stopped acting on it — the analyst reads this
+ * line, not the score.
+ */
+function burden(input: DraftInput): string {
+    const c = input.cases ?? 0;
+    const d = input.deaths ?? 0;
+
+    let core: string;
+    if (c > 0 && d > 0) core = `${c} case${c === 1 ? '' : 's'} and ${d} death${d === 1 ? '' : 's'}`;
+    else if (c > 0) core = `${c} case${c === 1 ? '' : 's'}, no deaths stated`;
+    else if (d > 0) core = `${d} death${d === 1 ? '' : 's'}, case count not stated`;
+    else return 'no case or death counts given in the source report';
+
+    const window = input.countPeriod ? ` covering ${input.countPeriod}` : '';
+    switch (input.countBasis) {
+        case 'historical_cumulative':
+            return `${core} reported as a cumulative historical total${window}, not current incidence`;
+        case 'outbreak_to_date':
+            return `${core} reported for this outbreak to date${window}`;
+        case 'period':
+            return `${core} reported${window || ' for the stated reporting period'}`;
+        default:
+            return `${core} reported; the source does not state what period this covers`;
+    }
 }
 
 const RISK_BY_TIER: Record<ScoreResult['tier'], MachineDraft['rra']['overallRisk']> = {
@@ -179,7 +202,7 @@ export function buildDraft(input: DraftInput, now: Date = new Date()): MachineDr
     // is everything around both. Splitting them this way is WHO's structure,
     // not a presentational choice.
     const hazard = sentences([
-        `${disease} reported in ${place}; ${burden(input.cases, input.deaths)}`,
+        `${disease} reported in ${place}; ${burden(input)}`,
         ...score.severity.reasons,
         ...score.unusualness.reasons,
     ]);
@@ -211,6 +234,19 @@ export function buildDraft(input: DraftInput, now: Date = new Date()): MachineDr
         uncertainties.push(
             'No baseline on record for this disease, so no expected level was available to compare against.'
         );
+    }
+    if (input.countBasis === 'historical_cumulative') {
+        uncertainties.push(
+            `The figures are a historical running total${input.countPeriod ? ` (${input.countPeriod})` : ''}, not current incidence. ` +
+            `They are excluded from the magnitude rules, so this assessment says nothing about how active the situation is now — ` +
+            `establishing the recent case count is the first thing to verify.`
+        );
+    } else if (!input.countBasis || input.countBasis === 'unknown') {
+        if ((input.cases ?? 0) > 0 || (input.deaths ?? 0) > 0) {
+            uncertainties.push(
+                'The source does not state what period the counts cover, so they are treated as current. If they turn out to be a running total, severity is overstated.'
+            );
+        }
     }
     if (score.confidence !== 'high') {
         uncertainties.push(

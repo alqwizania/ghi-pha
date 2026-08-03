@@ -19,7 +19,12 @@
  * health authority can defend.
  */
 
-export const SCORER_VERSION = 'ihr-annex2-v1';
+/**
+ * v2 (3 Aug 2026) — indicators now actually reach the scorer, and historical
+ * cumulative counts are excluded from the magnitude rules. Both change what a
+ * given event scores, so stored scores carry the version that produced them.
+ */
+export const SCORER_VERSION = 'ihr-annex2-v2';
 
 /** GCC members plus the neighbours sharing borders, corridors or pilgrim flows. */
 const GCC = new Set(['Saudi Arabia', 'United Arab Emirates', 'UAE', 'Qatar', 'Bahrain', 'Kuwait', 'Oman']);
@@ -40,6 +45,18 @@ const HIGH_CONNECTIVITY = new Set([
  */
 export const MASS_GATHERING_WINDOWS: Array<{ name: string; start: string; end: string }> = [];
 
+/**
+ * What span a case or death count covers.
+ *
+ * Counts are uninterpretable without this. WHO's MERS page reports 2,226 cases
+ * in Saudi Arabia "since 2012"; compared against an expected annual total it
+ * reads as eleven times the yearly burden, which scored the Kingdom's routine
+ * surveillance page as a critical event. Fourteen years of cases is not an
+ * anomaly, so `historical_cumulative` counts are excluded from the magnitude
+ * rules entirely rather than discounted by some invented factor.
+ */
+export type CountBasis = 'outbreak_to_date' | 'period' | 'historical_cumulative' | 'unknown';
+
 export interface ScoringInput {
     disease: string;
     country: string;
@@ -51,6 +68,22 @@ export interface ScoringInput {
     sourceId: string;
     /** Structured indicators read off the source text by the extractor. */
     indicators?: EpiIndicators;
+    /** What span the counts cover. Absent is treated as 'unknown'. */
+    countBasis?: CountBasis;
+    /** The reporting window as the source worded it, for the evidence trail. */
+    countPeriod?: string | null;
+}
+
+/**
+ * Whether a count can carry a magnitude judgement.
+ *
+ * `unknown` is allowed through deliberately. Most sources never state a window,
+ * and excluding them would silence the majority of real signals to avoid a
+ * minority of inflated ones. The uncertainty is recorded on the assessment
+ * draft instead, where an analyst sees it.
+ */
+function countsAreCurrent(input: ScoringInput): boolean {
+    return input.countBasis !== 'historical_cumulative';
 }
 
 export interface EpiIndicators {
@@ -173,9 +206,22 @@ function scoreSeverity(input: ScoringInput, baseline: DiseaseBaseline | null): D
 
     const cases = input.cases ?? 0;
     const deaths = input.deaths ?? 0;
+    const current = countsAreCurrent(input);
     const observedCfr = cases > 0 ? (deaths / cases) * 100 : null;
 
-    if (observedCfr !== null && baseline?.baselineCfr != null) {
+    // A multi-year running total says nothing about how bad things are now, and
+    // its CFR is drawn from the same history the baseline came from, so
+    // comparing the two is circular. Severity for these rests on what the
+    // pathogen is, not on how many cases it has caused since 2012.
+    if (!current) {
+        reasons.push(
+            input.countPeriod
+                ? `counts cover ${input.countPeriod} and are excluded from the magnitude rules as a historical total`
+                : 'counts are a historical cumulative total and are excluded from the magnitude rules'
+        );
+    }
+
+    if (current && observedCfr !== null && baseline?.baselineCfr != null) {
         if (observedCfr > baseline.baselineCfr * 1.5 && deaths >= 3) {
             score = Math.max(score, 3);
             reasons.push(`observed CFR ${observedCfr.toFixed(1)}% exceeds the ${baseline.baselineCfr}% baseline for ${baseline.disease}`);
@@ -191,19 +237,22 @@ function scoreSeverity(input: ScoringInput, baseline: DiseaseBaseline | null): D
         reasons.push(`${baseline.disease} carries a baseline CFR of ${baseline.baselineCfr}%`);
     }
 
-    if (deaths >= 100) {
+    if (current && deaths >= 100) {
         score = Math.max(score, 3);
         reasons.push(`${deaths} deaths reported`);
-    } else if (deaths >= 10) {
+    } else if (current && deaths >= 10) {
         score = Math.max(score, 2);
         reasons.push(`${deaths} deaths reported`);
-    } else if (deaths >= 1) {
+    } else if (current && deaths >= 1) {
         score = Math.max(score, 1);
         reasons.push(`${deaths} death${deaths === 1 ? '' : 's'} reported`);
     }
 
     // Deviation from expectation, not magnitude.
-    if (baseline?.expectedAnnualCases && cases > 0) {
+    if (!current) {
+        // Nothing count-derived applies; severity is carried by the pathogen
+        // characteristics and indicators handled below.
+    } else if (baseline?.expectedAnnualCases && cases > 0) {
         const ratio = cases / baseline.expectedAnnualCases;
         if (ratio >= 1) {
             score = Math.max(score, 3);

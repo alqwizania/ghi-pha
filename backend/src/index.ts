@@ -6,7 +6,7 @@ import * as schema from './db/schema';
 import { eq, desc, gte } from 'drizzle-orm';
 import { sign, verify } from 'hono/jwt';
 import { buildDraft, scoreFromRow, type MachineDraft } from './services/assessment-drafter';
-import type { ScoreResult } from './services/signal-scoring';
+import type { CountBasis, ScoreResult } from './services/signal-scoring';
 
 type Bindings = {
     HYPERDRIVE: Hyperdrive;
@@ -381,6 +381,19 @@ async function draftForSignal(
 
     if (!score) return null;
 
+    // The count basis lives on the radar event, not the signal — it describes
+    // the source's numbers, and the signal copies the numbers without it.
+    let countBasis: CountBasis | undefined;
+    let countPeriod: string | null | undefined;
+    if (signal.radarEventId) {
+        const evt = await db.query.radarEvents.findFirst({
+            where: eq(schema.radarEvents.id, signal.radarEventId),
+            columns: { countBasis: true, countPeriod: true },
+        });
+        countBasis = (evt?.countBasis ?? undefined) as CountBasis | undefined;
+        countPeriod = evt?.countPeriod;
+    }
+
     return buildDraft({
         disease: signal.disease,
         country: signal.country,
@@ -389,6 +402,8 @@ async function draftForSignal(
         sourceName: signal.sourceName,
         dateReported: signal.dateReported,
         score,
+        countBasis,
+        countPeriod,
     });
 }
 
