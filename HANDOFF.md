@@ -433,6 +433,43 @@ count, and among them were "measles outbreak in Delaware" and an Ebola
 escalation. The first report of an outbreak almost never has a number, and that
 is exactly the signal worth having. Currently 53 actionable of 111 total.
 
+## 🔴 The Anthropic API credit balance is exhausted (3 Aug 2026)
+
+Extraction stops when this happens. Sources report
+`parse_error: Your credit balance is too low`. Top up at
+console.anthropic.com → Plans & Billing, then run
+`npx tsx scripts/run-scan.mts --force`.
+
+Nothing is lost in the meantime: because a failed pass no longer stores the
+content hash (see below), every affected source retries on the next scan
+instead of going quiet. 11 sources are currently in this state with a null
+hash, waiting.
+
+## 📆 The retrospective window was a global 14 days (fixed 3 Aug 2026)
+
+A single global window has to be short for the picture to stay current, which
+then silently excludes every source publishing less often than the window.
+
+WHO EMRO issues its MERS update monthly. By the time anyone looked, the June
+update was 34 days old, so it was dropped — and the source reported `empty`,
+which reads as "no outbreaks" rather than "your window is shorter than my
+publication cycle". **The single most relevant source for a Saudi health
+authority could never land an event, and no diagnostic said so.**
+
+The window is now per-source, read from `config.retroWindowDays` with the
+14-day default for anything unset. Migration 016 sets it from actual cadence at
+roughly three publication intervals, so a missed cycle does not create a gap:
+120 days for the monthly WHO reports, 200 for CDC travel notices that stay in
+force for months, 60 for the weekly reports whose country tables lag.
+
+It had to be threaded through **four** layers — each parser, the insert, the
+promotion pass, and the stranded-event sweep — because every one of them drops
+events outside the window independently. Fixing three of four would have left
+the same silence with a different cause.
+
+Widening the windows took the corpus from 129 events to 235 and the
+auto-promoted queue from 10 to 13.
+
 ## 🔧 Four silent data-loss bugs (fixed 3 Aug 2026)
 
 All four had the same shape: code that looked wired up, ran without error, and

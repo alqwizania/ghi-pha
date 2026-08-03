@@ -1,6 +1,6 @@
 import { surveillanceSources, sourceSnapshots, radarEvents, signals, eventScores, signalLinks } from '../db/schema';
 import { scoreEvent, shouldAutoPromote, SCORER_VERSION, type CountBasis, type DiseaseBaseline, type EpiIndicators, type ScoreResult } from './signal-scoring';
-import { eq, and, gte, gt, isNull, or } from 'drizzle-orm';
+import { eq, and, gte, gt, isNull, or, sql } from 'drizzle-orm';
 import { extractEvents } from './event-extractor';
 
 // ============================================================
@@ -220,10 +220,25 @@ export const MASTER_SOURCES = [
 // Rolling retrospective window. Events older than this are ignored so the
 // radar always reflects the current epidemiological picture rather than a
 // window that silently widens as time passes.
+//
+// This is a *default*, not a rule. A single global window has to be shorter
+// than the fastest source's cadence to stay current, which then silently
+// excludes every source that publishes less often than that. WHO EMRO issues
+// its MERS update monthly: at 14 days the June update was already 34 days old
+// by the time anyone looked, so the Kingdom's own MERS surveillance source
+// could never land an event and reported itself as merely empty. Sources whose
+// cadence exceeds the default carry `retroWindowDays` in their registry config.
 const RETRO_WINDOW_DAYS = 14;
 
-export function cutoffDate(): string {
-  return new Date(Date.now() - RETRO_WINDOW_DAYS * 86400000).toISOString().substring(0, 10);
+export function cutoffDate(days: number = RETRO_WINDOW_DAYS): string {
+  return new Date(Date.now() - days * 86400000).toISOString().substring(0, 10);
+}
+
+/** The retrospective window for one source, honouring its registry config. */
+export function cutoffForSource(source: { config?: unknown } | undefined): string {
+  const configured = (source?.config as { retroWindowDays?: unknown } | undefined)?.retroWindowDays;
+  const days = typeof configured === 'number' && configured > 0 ? configured : RETRO_WINDOW_DAYS;
+  return cutoffDate(days);
 }
 
 // ============================================================
@@ -393,8 +408,7 @@ interface ParsedEvent {
 // ============================================================
 // FETCHER 1: WHO Disease Outbreak News (JSON API)
 // ============================================================
-function parseWHO_DONs(body: string): SourceResult {
-  const cutoff = cutoffDate();
+function parseWHO_DONs(body: string, cutoff: string): SourceResult {
   try {
     const data = JSON.parse(body);
     const items = data.value || [];
@@ -438,8 +452,7 @@ function parseWHO_DONs(body: string): SourceResult {
 // ============================================================
 // The xMART view exposes DATE / TOTAL_CONF_DEATHS. Ordering or reading any
 // other field name makes the OData endpoint reject the query with HTTP 400.
-function parseWHO_Mpox(body: string): SourceResult {
-  const cutoff = cutoffDate();
+function parseWHO_Mpox(body: string, cutoff: string): SourceResult {
   try {
     const data = JSON.parse(body);
     const items = data.value || [];
@@ -491,8 +504,7 @@ function parseWHO_Mpox(body: string): SourceResult {
 // an approved appname from https://apidoc.reliefweb.int.
 export const RELIEFWEB_APPNAME = '';
 
-function parseReliefWeb(body: string): SourceResult {
-  const cutoff = cutoffDate();
+function parseReliefWeb(body: string, cutoff: string): SourceResult {
   try {
     const data = JSON.parse(body);
     const items = data.data || [];
@@ -536,8 +548,7 @@ function parseReliefWeb(body: string): SourceResult {
 // ============================================================
 // GENERIC RSS FEED PARSER
 // ============================================================
-function parseRSS(sourceId: string, sourceName: string, feedUrl: string, xml: string): SourceResult {
-  const cutoff = cutoffDate();
+function parseRSS(sourceId: string, sourceName: string, feedUrl: string, xml: string, cutoff: string): SourceResult {
   try {
     const titles = extractXmlTags(xml, 'title');
     const links = extractXmlTags(xml, 'link');
@@ -709,7 +720,12 @@ async function parseWithModel(
     return failed(source.id, 'parse_error', outcome.detail);
   }
 
-  const cutoff = cutoffDate();
+  // The source's own window, not the global default. Filtering here with the
+  // 14-day default discarded WHO EMRO's monthly MERS update before it could be
+  // counted, so the source reported `empty` — indistinguishable from "no
+  // outbreaks" — while its page carried the Kingdom's MERS figures the whole
+  // time. Every layer that drops an event has to use the same window.
+  const cutoff = cutoffForSource(source);
   const today = new Date().toISOString().substring(0, 10);
   const events: ParsedEvent[] = [];
 
@@ -754,23 +770,26 @@ async function parseSource(
   body: string,
   apiKey: string | undefined
 ): Promise<SourceResult> {
+  // Every parser drops events outside the window, so they all need the source's
+  // own window rather than the global default.
+  const cutoff = cutoffForSource(source);
   switch (source.parserHint) {
     case 'ai':
       return parseWithModel(source, body, apiKey);
     case 'who_dons':
-      return parseWHO_DONs(body);
+      return parseWHO_DONs(body, cutoff);
     case 'who_mpox':
-      return parseWHO_Mpox(body);
+      return parseWHO_Mpox(body, cutoff);
     case 'reliefweb':
-      return parseReliefWeb(body);
+      return parseReliefWeb(body, cutoff);
     case 'rss':
-      return parseRSS(source.id, source.name, source.url, body);
+      return parseRSS(source.id, source.name, source.url, body, cutoff);
     default:
       // Anything registered without a specific extractor is treated as a page
       // of headlines. This is a deliberately weak default — it is what the
       // structured-extraction phase replaces.
       return source.fetchStrategy === 'rss'
-        ? parseRSS(source.id, source.name, source.url, body)
+        ? parseRSS(source.id, source.name, source.url, body, cutoff)
         : parseHTMLTitles(source.id, source.name, source.url, body);
   }
 }
@@ -853,6 +872,11 @@ export async function fetchGlobalRadarScan(db?: any, env?: any, options: { force
 
   const snapshotRows = await db.query.sourceSnapshots.findMany();
   const snapshots = new Map<string, any>(snapshotRows.map((s: any) => [s.sourceId, s]));
+
+  // A monthly source needs a longer memory than a daily one. See cutoffForSource.
+  const cutoffs = new Map<string, string>(
+    registered.map((s: any) => [s.id, cutoffForSource(s)])
+  );
 
   const now = Date.now();
   const due = registered.filter((s: any) => {
@@ -945,23 +969,19 @@ export async function fetchGlobalRadarScan(db?: any, env?: any, options: { force
     const dedupeKey = (sourceId: string, title: string) => `${sourceId}::${title.trim().toLowerCase()}`;
     const seen = new Set<string>();
 
-    try {
-      const existing = await db.query.radarEvents.findMany({
-        where: gte(radarEvents.dateReported, cutoff),
-        columns: { sourceId: true, title: true },
-      });
-      for (const row of existing) seen.add(dedupeKey(row.sourceId || '', row.title || ''));
-    } catch (err) {
-      console.error('[GHI Radar] Could not load existing events for dedupe:', err);
-    }
-
+    // `seen` deduplicates within this scan only. It used to be pre-loaded with
+    // everything already in the window, which meant an event the database
+    // already held was skipped before it reached the insert — so the upsert
+    // that exists to absorb revised figures could never fire for the case it
+    // was written for. The database's unique index is the durable guard; this
+    // set only stops one scan from fighting itself.
     for (const evt of allEvents) {
       try {
         const key = dedupeKey(evt.sourceId, evt.title);
         if (seen.has(key)) { skipped++; continue; }
         seen.add(key);
 
-        if (evt.dateReported >= cutoff) {
+        if (evt.dateReported >= (cutoffs.get(evt.sourceId) ?? cutoff)) {
           await db.insert(radarEvents).values({
             sourceId: evt.sourceId,
             sourceName: evt.sourceName,
@@ -1005,6 +1025,17 @@ export async function fetchGlobalRadarScan(db?: any, env?: any, options: { force
               sourceUrl: evt.sourceUrl,
               updatedAt: new Date(),
             },
+            // Only touch the row when something actually moved. Without this
+            // every scan would rewrite every event, bump updated_at, and send
+            // the whole corpus back through scoring on each pass.
+            setWhere: sql`
+              radar_events.cases        IS DISTINCT FROM excluded.cases
+              OR radar_events.deaths       IS DISTINCT FROM excluded.deaths
+              OR radar_events.summary      IS DISTINCT FROM excluded.summary
+              OR radar_events.count_basis  IS DISTINCT FROM excluded.count_basis
+              OR radar_events.count_period IS DISTINCT FROM excluded.count_period
+              OR radar_events.indicators   IS DISTINCT FROM excluded.indicators
+            `,
           });
           inserted++;
         }
@@ -1127,7 +1158,13 @@ export async function scoreAndPromotePending(
   db: any,
   limit = 400
 ): Promise<{ scored: number; promoted: number; corroborated: number }> {
+  // Promotion honours each source's own window, so a monthly source's event is
+  // not scored and then dropped on its way to triage.
+  const sourceRows = await db.query.surveillanceSources.findMany();
+  const cutoffs = new Map<string, string>(sourceRows.map((s: any) => [s.id, cutoffForSource(s)]));
   const cutoff = cutoffDate();
+  const widestCutoff = [...cutoffs.values(), cutoff].sort()[0];
+
   const baselineRows = await db.query.diseaseBaselines.findMany();
   const baselines: DiseaseBaseline[] = baselineRows.map((b: any) => ({
     disease: b.disease,
@@ -1231,7 +1268,7 @@ export async function scoreAndPromotePending(
       scored++;
 
       if (shouldAutoPromote(result)) {
-        promoted += await promoteScoredEvent(db, evt, result, cutoff);
+        promoted += await promoteScoredEvent(db, evt, result, cutoffs.get(evt.sourceId ?? '') ?? cutoff);
       }
     } catch (err) {
       console.error(`[GHI Scoring] Failed on event ${evt.id}:`, err);
@@ -1249,13 +1286,15 @@ export async function scoreAndPromotePending(
       .innerJoin(radarEvents, eq(radarEvents.id, eventScores.radarEventId))
       .where(and(
         eq(radarEvents.isPromoted, false),
-        gte(radarEvents.dateReported, cutoff)
+        // Widest configured window; each event is then held to its own below.
+        gte(radarEvents.dateReported, widestCutoff)
       ))
       .limit(limit);
 
     for (const row of stranded) {
       const evt = row.radar_events;
       const s = row.event_scores;
+      if (evt.dateReported < (cutoffs.get(evt.sourceId ?? '') ?? cutoff)) continue;
       if (!(s.mandatoryIhr || s.tier === 'critical' || s.tier === 'high') || s.confidence === 'low') continue;
 
       const evidence = (s.evidence ?? {}) as Record<string, string[]>;
