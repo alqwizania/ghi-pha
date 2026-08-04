@@ -80,7 +80,7 @@ function App() {
 
   const allNavItems = [
     { id: 'dashboard', label: 'DASHBOARD', icon: <DashboardIcon /> },
-    { id: 'radar', label: 'GLOBAL RADAR', icon: <RadarIcon /> },
+    { id: 'radar', label: 'RADAR', icon: <RadarIcon /> },
     { id: 'listener', label: 'LISTENER', icon: <ListenerIcon /> },
     { id: 'triage', label: 'TRIAGE', icon: <TriageIcon /> },
     { id: 'assessments', label: 'ASSESSMENTS', icon: <AssessmentIcon /> },

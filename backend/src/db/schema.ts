@@ -270,6 +270,8 @@ export const users = pgTable("users", {
         triage: 'view',
         assessment: 'view',
     }),
+    // Global Health or Public Health Intelligence. Added by migration 026.
+    department: varchar("department", { length: 60 }),
     lastLogin: timestamp("last_login", { withTimezone: true }),
     isActive: boolean("is_active").default(true),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),

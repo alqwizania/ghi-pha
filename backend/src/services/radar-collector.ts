@@ -230,6 +230,15 @@ export const MASTER_SOURCES = [
 // cadence exceeds the default carry `retroWindowDays` in their registry config.
 const RETRO_WINDOW_DAYS = 14;
 
+/**
+ * Sources fetched per scheduled pass. Each one costs several Worker
+ * subrequests, and the platform's ceiling is per invocation rather than per
+ * second — so this is a hard limit, not a politeness setting. At 14 sources on
+ * a six-hourly cron the full registry is covered roughly every 18 hours, which
+ * is well inside the retrospective windows.
+ */
+const MAX_SOURCES_PER_PASS = 14;
+
 export function cutoffDate(days: number = RETRO_WINDOW_DAYS): string {
   return new Date(Date.now() - days * 86400000).toISOString().substring(0, 10);
 }
@@ -443,8 +452,25 @@ async function renderWithCrawler(source: RegisteredSource, env?: any): Promise<F
       signal: AbortSignal.timeout(120000),
     }));
 
-    if (res.status === 401 || res.status === 403) {
+    if (res.status === 401) {
       return { body: null, status: 'http_error', detail: 'Crawler rejected the token' };
+    }
+    if (res.status === 403) {
+      // Not necessarily the token. Cloudflare Workers may only open outbound
+      // connections on a fixed set of ports — 80, 443, 8080, 8443 and a handful
+      // of others — and the edge answers 403 for anything else. crawl4ai's
+      // default 11235 is not on that list, so the cron failed against a crawler
+      // that answered a local curl perfectly. Reporting this as "token
+      // rejected" sent the investigation in exactly the wrong direction.
+      const port = (() => { try { return new URL(base).port; } catch { return ''; } })();
+      const ALLOWED = ['', '80', '443', '8080', '8443', '2052', '2053', '2082', '2083', '2086', '2087', '2095', '2096'];
+      return {
+        body: null,
+        status: 'http_error',
+        detail: ALLOWED.includes(port)
+          ? 'Crawler refused the request (403) — check the token'
+          : `Blocked: Workers cannot open outbound connections on port ${port}. Move the crawler to 8080 or 443.`,
+      };
     }
     if (!res.ok) {
       return { body: null, status: 'http_error', detail: `Crawler returned HTTP ${res.status}` };
@@ -1034,6 +1060,29 @@ export async function fetchGlobalRadarScan(db?: any, env?: any, options: { force
     const intervalMs = Math.max(1, s.fetchIntervalHours ?? 6) * 3600_000;
     return now - new Date(snap.lastFetchedAt).getTime() >= intervalMs;
   });
+
+  /**
+   * A Cloudflare Worker may only make a bounded number of outbound requests per
+   * invocation, and this scan spends several per source — the page fetch, then
+   * one or more extraction calls, and a crawler round trip for browser sources.
+   * Forty sources in one pass exceeded the ceiling and the last WHO sources in
+   * the queue failed with "Too many subrequests", which reads like an upstream
+   * problem and is not one.
+   *
+   * The batch is therefore capped, ordered by least-recently-fetched, so every
+   * source still comes round — just across successive cron ticks rather than
+   * all in one. A manual scan from the interface keeps the full set, because an
+   * operator pressing Scan is asking for now and is running interactively.
+   */
+  const perPass = options.force ? due.length : Math.min(due.length, MAX_SOURCES_PER_PASS);
+  if (perPass < due.length) {
+    due.sort((a: any, b: any) => {
+      const at = snapshots.get(a.id)?.lastFetchedAt;
+      const bt = snapshots.get(b.id)?.lastFetchedAt;
+      return new Date(at ?? 0).getTime() - new Date(bt ?? 0).getTime();
+    });
+    due.length = perPass;
+  }
 
   console.log(`[GHI Radar] ${registered.length} enabled sources, ${due.length} due this pass`);
 

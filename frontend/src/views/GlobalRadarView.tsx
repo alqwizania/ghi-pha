@@ -141,6 +141,16 @@ export default function GlobalRadarView({ onPromoteToTriage }: GlobalRadarViewPr
   const [diseaseFilter, setDiseaseFilter] = useState<string>('all');
   const [riskFilter, setRiskFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  /**
+   * The retrospective window the operator is looking through, in days.
+   *
+   * Opens at 14 — the default collection window — rather than at everything,
+   * because the first question about a marker is almost always "is this now?".
+   * Sources with longer windows (WHO publishes mpox quarterly) only appear as
+   * the slider is widened, which makes the age of a signal a property the
+   * operator can see rather than one they have to click each marker to learn.
+   */
+  const [windowDays, setWindowDays] = useState<number>(14);
   const [events, setEvents] = useState<RadarEvent[]>([]);
   const [scanning, setScanning] = useState(false);
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
@@ -346,7 +356,12 @@ export default function GlobalRadarView({ onPromoteToTriage }: GlobalRadarViewPr
 
   const uniqueDiseases = Array.from(new Set(events.map(e => e.disease)));
 
+  // The window cutoff as a date string, compared directly against
+  // `dateReported` which the API returns as YYYY-MM-DD.
+  const windowCutoff = new Date(Date.now() - windowDays * 86400000).toISOString().slice(0, 10);
+
   const filteredEvents = events.filter(e => {
+    if (String(e.dateReported || '').slice(0, 10) < windowCutoff) return false;
     if (selectedBoard !== 'all' && e.boardType !== selectedBoard) return false;
     if (diseaseFilter !== 'all' && e.disease !== diseaseFilter) return false;
     if (riskFilter !== 'all' && e.riskLevel !== riskFilter) return false;
@@ -635,6 +650,38 @@ export default function GlobalRadarView({ onPromoteToTriage }: GlobalRadarViewPr
             <option value="Moderate">Moderate Only</option>
             <option value="Low">Low Only</option>
           </select>
+
+          {/*
+            Retrospective window.
+            The map showed every event it held with no indication of age, so a
+            report from three weeks ago and one from this morning were the same
+            dot. Dragging this narrows the map to recent reporting and widens it
+            to the full retrospective record — the age of a signal becomes
+            something the operator can see rather than click to discover.
+          */}
+          <div className="flex items-center gap-2.5 border-l border-white/10 pl-3">
+            <div className="flex flex-col gap-0.5">
+              <span className="text-[8px] font-black uppercase tracking-[0.16em] text-slate-500 leading-none">
+                Window
+              </span>
+              <span className="text-[10px] font-black text-ghi-teal tabular-nums leading-none">
+                {windowDays >= 200 ? 'All records' : `Last ${windowDays}d`}
+              </span>
+            </div>
+            <input
+              type="range"
+              min={1}
+              max={200}
+              step={1}
+              value={windowDays}
+              onChange={e => setWindowDays(Number(e.target.value))}
+              title={windowDays >= 200 ? 'All retained records' : `Since ${windowCutoff}`}
+              className="w-32 accent-ghi-teal cursor-pointer"
+            />
+            <span className="text-[10px] text-slate-500 tabular-nums whitespace-nowrap">
+              {filteredEvents.length}
+            </span>
+          </div>
 
           {/* Board Category Pill Tabs */}
           <div className="flex items-center gap-1 border-l border-white/10 pl-2">

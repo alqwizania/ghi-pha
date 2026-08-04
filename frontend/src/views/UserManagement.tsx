@@ -13,6 +13,10 @@ const UserManagement = () => {
         fullName: '',
         password: '',
         role: 'Analyst',
+        // PHA runs two teams against this platform. Recording which one an
+        // account belongs to is what lets an audit answer 'who decided this'
+        // with a team as well as a name.
+        department: 'Global Health',
         permissions: {
             dashboard: 'view',
             radar: 'view',
@@ -47,6 +51,7 @@ const UserManagement = () => {
                 fullName: '',
                 password: '',
                 role: 'Analyst',
+                department: 'Global Health',
                 permissions: {
                     dashboard: 'view',
                     radar: 'view',
@@ -142,6 +147,17 @@ const UserManagement = () => {
                                         <option value="Director" className="bg-slate-900 text-white">DIRECTOR</option>
                                         <option value="Superadmin" className="bg-slate-900 text-white">SUPERADMIN</option>
                                         <option value="Admin" className="bg-slate-900 text-white">ADMIN</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1.5 block">Department</label>
+                                    <select
+                                        className="w-full bg-slate-900 border border-white/10 rounded-xl px-5 py-3 text-sm text-ghi-teal focus:border-ghi-teal outline-none transition-all font-black appearance-none"
+                                        value={editingUser.department || 'Global Health'}
+                                        onChange={e => setEditingUser({ ...editingUser, department: e.target.value })}
+                                    >
+                                        <option value="Global Health" className="bg-slate-900 text-white">GLOBAL HEALTH</option>
+                                        <option value="Public Health Intelligence" className="bg-slate-900 text-white">PUBLIC HEALTH INTELLIGENCE</option>
                                     </select>
                                 </div>
                                 <div className="pt-4">

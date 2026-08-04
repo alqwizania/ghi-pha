@@ -125,6 +125,46 @@ app.use('/api/v1/users', requireAdmin);
 app.use('/api/v1/users/*', requireAdmin);
 app.use('/api/admin/*', requireAdmin);
 
+/**
+ * Per-view permissions, enforced.
+ *
+ * The users table has carried a permissions object since the beginning and the
+ * API never once consulted it — the front end greyed out a button and the
+ * endpoint behind it stayed wide open, so any authenticated account could
+ * accept a signal or escalate an assessment by calling it directly. Role labels
+ * without server-side checks are an organisation chart, not access control.
+ *
+ * 'view' is read-only: it permits GET and refuses anything that writes. 'edit'
+ * permits both. A missing entry denies, so adding a view without granting it
+ * fails closed.
+ */
+const requireView = (view: string) => async (c: any, next: any) => {
+    const user = c.get('user') as SessionUser | undefined;
+    if (!user) return c.json({ error: 'Authentication required' }, 401);
+
+    // Superadmin and Admin administer the platform itself and are not
+    // constrained by per-view grants; every other role is.
+    if (ADMIN_ROLES.has(user.role) && user.role !== 'Director') return next();
+
+    const level = user.permissions?.[view];
+    if (!level) {
+        return c.json({ error: `No access to ${view}` }, 403);
+    }
+    if (level === 'view' && c.req.method !== 'GET') {
+        return c.json({ error: `Read-only access to ${view}` }, 403);
+    }
+    return next();
+};
+
+app.use('/api/radar/*', requireView('radar'));
+app.use('/api/v1/radar/*', requireView('radar'));
+app.use('/api/v1/social-signals*', requireView('listener'));
+app.use('/api/v1/monitored-accounts*', requireView('listener'));
+app.use('/api/v1/signals/*', requireView('triage'));
+app.use('/api/v1/assessments', requireView('assessment'));
+app.use('/api/v1/assessments/*', requireView('assessment'));
+app.use('/api/v1/escalations*', requireView('assessment'));
+
 // Diagnostic Endpoint
 app.get('/api/v1/ping', (c) => {
     return c.json({
@@ -265,6 +305,9 @@ app.post('/api/v1/users', async (c) => {
 
         await db.insert(schema.users).values({
             username: body.username,
+            // Which PHA department the account belongs to. An audit trail that
+            // cannot say which team took a decision is weaker than one that can.
+            department: body.department || "Global Health",
             email: body.email,
             fullName: body.fullName,
             role: body.role || 'Analyst',
@@ -518,6 +561,7 @@ app.put('/api/v1/users/:id', async (c) => {
         email: body.email,
         role: body.role,
         permissions: body.permissions,
+            department: body.department,
         updatedAt: new Date()
     };
 

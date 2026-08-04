@@ -272,6 +272,13 @@ export default function Dashboard() {
                 : e.score.tier === 'moderate' ? 'Moderate Risk' : 'Routine',
               cases: e.cases ?? 0,
               cfr: `${Number(e.cfr ?? 0).toFixed(2)}%`,
+              // When it was reported. Without it a three-week-old row and this
+              // morning's read identically, and recency is half of what makes
+              // a regional threat actionable.
+              reported: e.dateReported ? String(e.dateReported).slice(0, 10) : null,
+              ageDays: e.dateReported
+                ? Math.floor((Date.now() - new Date(e.dateReported).getTime()) / 86400000)
+                : null,
               status: e.score.mandatoryIhr
                 ? 'IHR Notifiable'
                 : `${e.score.domainsAtTwo} of 4 IHR domains met`,
@@ -282,7 +289,17 @@ export default function Dashboard() {
                     <span className="text-sm font-black text-white">{threat.disease}</span>
                     <span className="text-xs text-slate-400 font-bold">• {threat.country}</span>
                   </div>
-                  <p className="text-[11px] text-slate-500 mt-0.5">{threat.status} — {threat.cases} Reported Cases</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    {threat.status} — {threat.cases} Reported Cases
+                    {threat.reported && (
+                      <span className="text-slate-600"> · reported {threat.reported}
+                        {threat.ageDays !== null && threat.ageDays <= 2 && (
+                          <span className="text-ghi-teal font-bold">
+                            {threat.ageDays === 0 ? " · today" : " · yesterday"}</span>
+                        )}
+                      </span>
+                    )}
+                  </p>
                 </div>
                 <div className="flex items-center gap-3 self-end sm:self-center">
                   <span className="text-[11px] font-bold text-slate-400">CFR {threat.cfr}</span>
