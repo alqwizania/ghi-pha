@@ -64,7 +64,14 @@ export default function Dashboard() {
     // looks identical whether the world is quiet or the collectors are down,
     // and that is the single most dangerous ambiguity in a surveillance
     // dashboard. Source health resolves it.
-    const live = sources.filter((s: any) => s.health === 'live' || s.lastStatus === 'ok').length;
+    // Only sources the platform is actually trying to collect from. Measuring
+    // against all 59 registered made 34 look like a failure when 18 of the
+    // remainder are deliberately retired — superseded duplicates, a test site,
+    // and feeds needing credentials nobody has requested.
+    const active = sources.filter((s: any) => s.enabled !== false);
+    const live = active.filter((s: any) => s.health === 'live' || s.lastStatus === 'ok').length;
+    const quiet = active.filter((s: any) => (s.health ?? s.lastStatus) === 'empty' || (s.health ?? s.lastStatus) === 'quiet').length;
+    const retired = sources.length - active.length;
     const down = sources.filter((s: any) =>
       ['down', 'http_error', 'network_error', 'parse_error'].includes(s.health ?? s.lastStatus)).length;
     const blocked = sources.filter((s: any) => (s.health ?? s.lastStatus) === 'disabled').length;
@@ -147,7 +154,7 @@ export default function Dashboard() {
       autoPromoted,
       regionalThreats,
       regionalCount: regionalThreats.length,
-      live, down, blocked, sourceTotal: sources.length,
+      live, down, blocked, quiet, retired, sourceTotal: active.length, registered: sources.length,
       oldestPendingDays,
       notifiable: notifiable.length,
       notifiableUnreviewed,

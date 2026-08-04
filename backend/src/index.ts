@@ -7,6 +7,7 @@ import { eq, desc, gte } from 'drizzle-orm';
 import { sign, verify } from 'hono/jwt';
 import { buildDraft, scoreFromRow, type MachineDraft } from './services/assessment-drafter';
 import type { CountBasis, ScoreResult } from './services/signal-scoring';
+import { pollListener } from './services/listener-poller';
 
 type Bindings = {
     HYPERDRIVE: Hyperdrive;
@@ -880,9 +881,36 @@ app.post('/api/admin/reset-db', async (c) => {
 
 export default {
     fetch: app.fetch,
+    /**
+     * The unattended run. Cloudflare fires this on the cron in wrangler.toml;
+     * nothing on anyone's machine needs to be awake.
+     *
+     * Both streams run. The listener was absent here — it existed, it worked,
+     * and it only ever ran when someone invoked it by hand, which meant the
+     * social half of the platform was quietly manual while appearing live.
+     *
+     * The listener is capped per run. X bills per post read, and an unattended
+     * job that can spend without limit is a job that will eventually spend
+     * without limit.
+     */
     async scheduled(event: any, env: Bindings, ctx: ExecutionContext) {
         const dbClient = getDB(env);
-        ctx.waitUntil(fetchGlobalRadarScan(dbClient, env));
+        ctx.waitUntil((async () => {
+            try {
+                await fetchGlobalRadarScan(dbClient, env);
+            } catch (err) {
+                console.error('[GHI Cron] Radar scan failed:', err);
+            }
+            try {
+                if (env.X_BEARER_TOKEN) {
+                    await pollListener(dbClient, env, { budgetUsd: 1.0 });
+                }
+            } catch (err) {
+                // A listener failure must not be reported as a radar failure,
+                // and must not prevent the next scheduled radar run.
+                console.error('[GHI Cron] Listener poll failed:', err);
+            }
+        })());
     },
 };
 
