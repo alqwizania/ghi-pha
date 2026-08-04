@@ -279,7 +279,9 @@ app.get('/api/v1/signals', async (c) => {
         orderBy: [desc(schema.signals.createdAt)],
         with: { assessments: true, escalations: true }
     });
-    return c.json(result);
+    // Same rule as assessments: archived stays on the record, out of the queues.
+    if (c.req.query('all') === '1') return c.json(result);
+    return c.json(result.filter((s) => s.currentStatus !== 'Archived'));
 });
 
 app.post('/api/v1/signals/:id/accept', async (c) => {
@@ -419,9 +421,14 @@ app.post('/api/v1/signals/:id/reject', async (c) => {
 app.get('/api/v1/assessments', async (c) => {
     const db = getDB(c.env);
     const result = await db.query.assessments.findMany({
-        with: { signal: true }
+        with: { signal: true },
+        orderBy: [desc(schema.assessments.updatedAt)],
     });
-    return c.json(result);
+    // Archived records are kept for audit but excluded from the working queues,
+    // so every view agrees on what is live without each applying its own filter.
+    // `?all=1` returns them, matching the radar endpoint's convention.
+    if (c.req.query('all') === '1') return c.json(result);
+    return c.json(result.filter((a) => a.status !== 'Archived'));
 });
 
 app.put('/api/v1/assessments/:id', async (c) => {

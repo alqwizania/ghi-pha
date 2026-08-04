@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { fetchAssessments, updateAssessment, escalateAssessment } from '../lib/api';
+import { isOpenAssessment, RISK_TIERS } from '../lib/pipeline';
 
 const IHR_QUESTIONS = [
     { id: 'q1', notes: 'q1Notes', text: 'Public health impact serious?' },
@@ -36,9 +37,13 @@ const AssessmentView = ({ user }: any) => {
         setLoading(true);
         fetchAssessments()
             .then(data => {
-                setAssessments(data.filter((a: any) => a.status === 'Draft' || a.status === 'Under Assessment'));
-                if (data.length > 0 && !selectedId) {
-                    selectAssessment(data[0]);
+                // Filter and auto-select must agree. Selecting from the
+                // unfiltered list could land on an assessment the queue does
+                // not contain, leaving the view with nothing to render.
+                const open = data.filter(isOpenAssessment);
+                setAssessments(open);
+                if (open.length > 0 && !selectedId) {
+                    selectAssessment(open[0]);
                 }
             })
             .finally(() => setLoading(false));
@@ -161,7 +166,7 @@ const AssessmentView = ({ user }: any) => {
                 <div className="glass-panel p-6 rounded-3xl border border-ghi-blue/10">
                     <h4 className="text-[11px] font-black text-slate-500 uppercase tracking-widest mb-6">Risk Calibration</h4>
                     <div className="space-y-4">
-                        {['Low', 'Moderate', 'High', 'Critical'].map(level => (
+                        {RISK_TIERS.map(level => (
                             <button
                                 key={level}
                                 onClick={() => setRraData({ ...rraData, riskLevel: level })}

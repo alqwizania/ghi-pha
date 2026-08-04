@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { fetchSignals, fetchAssessments, fetchRadarEvents } from '../lib/api';
+import { ASSESSMENT_STATUS, isOpenAssessment } from '../lib/pipeline';
 import { Activity, ShieldAlert, Globe, Clock, CheckCircle2, TrendingUp, Layers, BarChart3 } from 'lucide-react';
 
 export default function Dashboard() {
@@ -27,8 +28,11 @@ export default function Dashboard() {
 
   const stats = useMemo(() => {
     const pendingTriage = signals.filter(s => s.triageStatus === 'Pending Triage' || !s.triageStatus).length;
-    const activeAssessments = assessments.filter(a => a.status === 'Draft' || a.status === 'Under Review').length;
-    const escalated = assessments.filter(a => a.status === 'Escalated').length;
+    // Shared vocabulary — this used to match 'Under Review', a status the
+    // backend never writes, while the Assessment view matched 'Under
+    // Assessment'. The two screens disagreed about the same rows.
+    const activeAssessments = assessments.filter(isOpenAssessment).length;
+    const escalated = assessments.filter(a => a.status === ASSESSMENT_STATUS.escalated).length;
     const scored = events.filter(e => e.score);
     const criticalCount = scored.filter(e => e.score.tier === 'critical').length;
     const autoPromoted = signals.filter(s => s.autoPromoted).length;
