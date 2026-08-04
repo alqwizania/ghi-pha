@@ -177,6 +177,57 @@ td.num{text-align:right;font-variant-numeric:tabular-nums;color:var(--txt);font-
 #hint{font-size:9.5px;letter-spacing:.14em;color:var(--dimmer);text-transform:uppercase;font-weight:500;padding-left:4px;border-left:1px solid var(--line);margin-left:2px}
 
 .footnote{font-size:12px;color:var(--dimmer);line-height:1.6;margin-top:auto;padding-top:18px}
+
+/* ============================================================
+   Print / PDF.
+
+   The deck is a single page that shows one slide at a time, so printing it
+   unchanged yields exactly one page — slide 1, and nothing else. This turns
+   every slide back into a page.
+
+   Two details make it work. `-webkit-print-color-adjust: exact` keeps the dark
+   ground and the accent colours; without it browsers helpfully strip the
+   backgrounds and the deck prints as dark text on white with invisible teal.
+   And the top and bottom bars are switched to `position: fixed`, which is the
+   long-standing trick for repeating an element on every printed page — they
+   live outside the slides, so otherwise the PHA identity would appear on page
+   one only.
+   ============================================================ */
+@media print{
+  @page{ size:1600px 900px; margin:0 }
+
+  html,body{
+    height:auto;overflow:visible;background:var(--ink);
+    -webkit-print-color-adjust:exact;print-color-adjust:exact;
+  }
+
+  /* The 16:9 stage becomes a plain stack; the screen scaling is undone so each
+     slide prints at its true size rather than at whatever fraction of the last
+     viewport it happened to be showing. */
+  #stage{position:static;display:block;height:auto}
+  #canvas{
+    width:1600px;height:auto;transform:none!important;border-radius:0;overflow:visible;
+  }
+  #canvas::before{display:none}
+
+  .slide{
+    position:relative;display:flex!important;opacity:1!important;transform:none!important;
+    width:1600px;height:900px;break-after:page;page-break-after:always;
+    animation:none!important;
+  }
+  .slide:last-child{break-after:auto;page-break-after:auto}
+  .slide > *{animation:none!important;opacity:1!important}
+
+  /* Repeat on every page. */
+  .topbar{position:fixed;top:0}
+  .footbar{position:fixed;bottom:0}
+
+  /* Screen-only chrome. */
+  #nav,#hint,.progress,.radar-badge svg path[fill^="url"]{display:none!important}
+
+  /* A sweeping radar is meaningless on paper; the rings still read. */
+  .radar-badge circle{animation:none!important}
+}
 </style>
 </head>
 <body>
