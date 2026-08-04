@@ -170,6 +170,9 @@ export default function GlobalRadarView({ onPromoteToTriage }: GlobalRadarViewPr
   // learning the map, then never again — so it should not permanently occupy a
   // corner of the operating picture.
   const [isLegendOpen, setIsLegendOpen] = useState(false);
+  // Open by default: this is peripheral context an operator notices changing,
+  // not something they consult. Collapsible for when the map matters more.
+  const [isTimelineOpen, setIsTimelineOpen] = useState(true);
   /**
    * True screen fullscreen, via the browser's own API rather than a CSS
    * overlay.
@@ -378,7 +381,19 @@ export default function GlobalRadarView({ onPromoteToTriage }: GlobalRadarViewPr
       ref={mapRef}
       className={isFullscreen
         ? 'relative w-full h-screen overflow-hidden bg-[#060a14]'
-        : 'relative w-full h-[calc(100vh-170px)] min-h-[500px] rounded-3xl overflow-hidden border border-white/10 bg-[#060a14] shadow-2xl'}>
+        /*
+          Fills whatever height the main column gives it, rather than guessing
+          at 100vh minus a hardcoded 170px. That guess ignored the main
+          column's own padding and the view header above it, so below roughly
+          700px of viewport the min-height won and the *inner* container
+          scrolled — invisible to a document-level scroll check, which is how
+          it survived this long.
+
+          flex-1 with min-h-0 is the fix: min-h-0 is required because a flex
+          item defaults to min-height:auto and refuses to shrink below its
+          content, which is what forces the overflow in the first place.
+        */
+        : 'relative w-full flex-1 min-h-0 rounded-3xl overflow-hidden border border-white/10 bg-[#060a14] shadow-2xl'}>
       
       {/* FULLSCREEN REAL WORLD MAP CANVAS (react-simple-maps) */}
       <div className="absolute inset-0 w-full h-full cursor-grab active:cursor-grabbing">
@@ -1085,21 +1100,47 @@ export default function GlobalRadarView({ onPromoteToTriage }: GlobalRadarViewPr
         number. Bars are stacked by severity, and clicking one narrows the
         window to that day.
       */}
+      {/*
+        Open by default, collapsible to its header.
+
+        Not placed below the map: that would either shrink the map permanently
+        or introduce page scroll, and in fullscreen there is no "below" — the
+        map is the page. Not collapsed by default either, because unlike the
+        legend this is not something an operator consults. It is peripheral
+        context you notice changing, and hiding it means suspecting acceleration
+        before you can see it. Collapsing stays available for when the southern
+        half of the map matters more than the curve.
+      */}
       <div className="absolute bottom-4 left-6 right-6 md:right-24 bg-slate-950/90 backdrop-blur-2xl border border-white/10 rounded-2xl px-4 py-2.5 z-30 shadow-2xl pointer-events-auto">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
+        <div className={`flex items-center justify-between ${isTimelineOpen ? 'mb-2' : ''}`}>
+          <button
+            onClick={() => setIsTimelineOpen(v => !v)}
+            className="flex items-center gap-2 group"
+            title={isTimelineOpen ? 'Collapse timeline' : 'Expand timeline'}
+          >
             <Rss className="w-3 h-3 text-ghi-teal" />
-            <span className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">
+            <span className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 group-hover:text-white transition-colors">
               Reporting Timeline
             </span>
-            <span className="text-[9px] text-slate-600">
+            <svg className={`w-2.5 h-2.5 text-slate-500 transition-transform ${isTimelineOpen ? '' : 'rotate-180'}`}
+              fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7"/>
+            </svg>
+          </button>
+          {/* Collapsed, the header still carries the numbers — a strip that
+              says nothing is worse than no strip. */}
+          <div className="flex items-center gap-3 text-[9px] text-slate-600 tabular-nums">
+            <span>
               {filteredEvents.length} events over {windowDays >= 200 ? 'all records' : `${windowDays} days`}
             </span>
+            {timeline.peak > 0 && <span>peak {timeline.peak}/day</span>}
+            {!isTimelineOpen && timeline.days.at(-1)?.total ? (
+              <span className="text-ghi-teal">{timeline.days.at(-1)?.total} today</span>
+            ) : null}
           </div>
-          {timeline.peak > 0 && (
-            <span className="text-[9px] text-slate-600 tabular-nums">peak {timeline.peak}/day</span>
-          )}
         </div>
+
+        {isTimelineOpen && (<>
 
         {/* items-stretch, not items-end: with items-end each bar sizes to its
             content, so the percentage heights below resolve against zero and
@@ -1133,6 +1174,7 @@ export default function GlobalRadarView({ onPromoteToTriage }: GlobalRadarViewPr
           <span>{timeline.days[0]?.date}</span>
           <span>today</span>
         </div>
+        </>)}
       </div>
     </div>
   );

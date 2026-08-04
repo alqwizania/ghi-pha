@@ -197,7 +197,11 @@ function App() {
             </div>
           </header>
 
-          <div className="relative z-10 flex-1">
+          {/* min-h-0 lets a view that wants to fill the column actually shrink
+              to it. Without it a flex item's min-height:auto default refuses to
+              go below its content, so the Radar map pushed the main column into
+              an inner scroll that no document-level check would reveal. */}
+          <div className="relative z-10 flex-1 min-h-0 flex flex-col">
             {activeView === 'dashboard' && <Dashboard />}
             {activeView === 'radar' && <GlobalRadarView user={user} onPromoteToTriage={() => navigate('triage')} />}
             {activeView === 'listener' && <ListenerView user={user} />}
