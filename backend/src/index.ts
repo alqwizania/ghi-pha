@@ -636,7 +636,7 @@ app.get('/api/v1/listener-keywords', async (c) => {
     return c.json(result);
 });
 
-import { fetchGlobalRadarScan, promoteRadarEventToSignal, MASTER_SOURCES, cutoffDate } from './services/radar-collector';
+import { fetchGlobalRadarScan, promoteRadarEventToSignal, MASTER_SOURCES, cutoffDate, cutoffForSource } from './services/radar-collector';
 
 // --- GLOBAL RADAR ROUTES ---
 
@@ -680,14 +680,31 @@ app.get('/api/radar/events', async (c) => {
         const dbClient = getDB(c.env);
         const includeAll = c.req.query('all') === '1';
 
+        // Each source keeps its own retrospective window: WHO publishes MERS
+        // monthly and mpox figures quarterly, so a global 14-day cut discards
+        // most of what those sources exist to provide.
+        //
+        // This endpoint was the one layer still applying the global default
+        // after the per-source windows landed everywhere else — collection was
+        // correctly keeping 120 days of WHO mpox data and the display was
+        // hiding 101 of those events. Collecting something and then refusing to
+        // show it is indistinguishable, to an operator, from never collecting it.
+        const sourceRows = await dbClient.query.surveillanceSources.findMany();
+        const windows = new Map<string, string>(
+            sourceRows.map((s: any) => [s.id, cutoffForSource(s)])
+        );
+        const widest = [...windows.values(), cutoffDate()].sort()[0];
+
         const rows = await dbClient
             .select()
             .from(schema.radarEvents)
             .leftJoin(schema.eventScores, eq(schema.eventScores.radarEventId, schema.radarEvents.id))
-            .where(gte(schema.radarEvents.dateReported, cutoffDate()))
+            .where(gte(schema.radarEvents.dateReported, widest))
             .orderBy(desc(schema.radarEvents.createdAt));
 
         const enriched = rows
+            .filter((r: any) =>
+                r.radar_events.dateReported >= (windows.get(r.radar_events.sourceId) ?? cutoffDate()))
             .filter((r: any) => includeAll || r.event_scores?.reportsOccurrence !== false)
             .map((r: any) => ({
                 ...r.radar_events,
