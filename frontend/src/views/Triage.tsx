@@ -11,79 +11,10 @@ export default function Triage({ user }: any) {
   const [diseaseFilter, setDiseaseFilter] = useState('ALL DISEASES');
   const [regionFilter, setRegionFilter] = useState('ALL REGIONS');
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const canAction = user?.permissions?.triage === 'edit' || user?.permissions?.triage === 'update' || user?.role === 'Admin' || user?.role === 'Superadmin';
 
-  const seedSignals = [
-    {
-      id: 'sig-101',
-      disease: 'Cholera',
-      country: 'Yemen',
-      location: 'Al Hodeidah Coastal District',
-      cases: 420,
-      deaths: 12,
-      caseFatalityRate: '2.85',
-      priorityScore: '88.50',
-      description: 'Acute watery diarrhea surge reported across coastal districts following flood damage to water infrastructure.',
-      sourceUrl: 'https://beacon.bio/alerts/yemen-cholera-2026',
-      sourceOrigin: 'radar',
-      sourceName: 'Beacon Bio Intelligence',
-      triageStatus: 'Pending Triage',
-      createdAt: '2026-07-28T10:00:00Z',
-      verificationDeadline: new Date(Date.now() + 18 * 60 * 60 * 1000).toISOString()
-    },
-    {
-      id: 'sig-102',
-      disease: 'Neisseria meningitidis',
-      country: 'Sudan',
-      location: 'Gedaref Camp 4',
-      cases: 85,
-      deaths: 9,
-      caseFatalityRate: '10.58',
-      priorityScore: '94.00',
-      description: 'Laboratory confirmed cases of Serogroup C meningococcal disease in temporary displaced shelters.',
-      sourceUrl: 'https://www.who.int/emergencies/disease-outbreak-news/item/sudan-meningitis',
-      sourceOrigin: 'radar',
-      sourceName: 'WHO Disease Outbreak News',
-      triageStatus: 'Pending Triage',
-      createdAt: '2026-07-26T14:30:00Z',
-      verificationDeadline: new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString()
-    },
-    {
-      id: 'sig-103',
-      disease: 'Avian Influenza H5N1',
-      country: 'Egypt',
-      location: 'Delta Region Livestock Farms',
-      cases: 34,
-      deaths: 0,
-      caseFatalityRate: '0.00',
-      priorityScore: '82.00',
-      description: 'Mammalian transmission alert triggered. Veterinary surveillance confirming viral clade 2.3.4.4b.',
-      sourceUrl: 'https://promedmail.org/post/20260727.87192',
-      sourceOrigin: 'radar',
-      sourceName: 'ProMED-mail Feed',
-      triageStatus: 'Pending Triage',
-      createdAt: '2026-07-27T08:15:00Z',
-      verificationDeadline: new Date(Date.now() + 22 * 60 * 60 * 1000).toISOString()
-    },
-    {
-      id: 'sig-104',
-      disease: 'Dengue Fever',
-      country: 'Saudi Arabia',
-      location: 'Jeddah South District',
-      cases: 14,
-      deaths: 0,
-      caseFatalityRate: '0.00',
-      priorityScore: '65.00',
-      description: 'Social listening cluster detecting reports of high fever and joint pain following rainy weekend.',
-      sourceUrl: 'https://twitter.com/health_alert/status/18823719',
-      sourceOrigin: 'listener',
-      sourceName: 'Social Listener (X/Twitter)',
-      triageStatus: 'Pending Triage',
-      createdAt: '2026-07-29T11:20:00Z',
-      verificationDeadline: new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString()
-    }
-  ];
 
   const loadSignals = async () => {
     setLoading(true);
@@ -93,13 +24,15 @@ export default function Triage({ user }: any) {
         .filter((s: any) => s.triageStatus === 'Pending Triage' || !s.triageStatus)
         .sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
 
-      if (pending && pending.length > 0) {
-        setAllSignals(pending);
-      } else {
-        setAllSignals(seedSignals);
-      }
-    } catch {
-      setAllSignals(seedSignals);
+      setAllSignals(pending);
+      setLoadError(null);
+    } catch (err) {
+      // Was a fallback to invented signals carrying fabricated priority scores.
+      // An empty queue and a broken API are completely different situations,
+      // and an analyst has to be able to tell them apart before deciding there
+      // is nothing to work on.
+      setAllSignals([]);
+      setLoadError(err instanceof Error ? err.message : 'Could not reach the surveillance API');
     } finally {
       setLoading(false);
     }
@@ -153,6 +86,21 @@ export default function Triage({ user }: any) {
 
   return (
     <div className="space-y-6 pb-12">
+      {loadError && (
+        <div className="rounded-2xl border border-ghi-critical/50 bg-ghi-critical/10 p-4 flex items-start gap-3">
+          <svg className="w-5 h-5 text-ghi-critical shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+              d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.84-2.75L13.74 4a2 2 0 00-3.48 0L3.16 16.25A2 2 0 005 19z"/>
+          </svg>
+          <div>
+            <p className="text-[11px] font-black text-ghi-critical uppercase tracking-widest">Surveillance data unavailable</p>
+            <p className="text-[11px] text-slate-300 mt-1">{loadError}</p>
+            <p className="text-[10px] text-slate-500 mt-1">
+              Nothing below is current. This is a connection failure, not an all-clear.
+            </p>
+          </div>
+        </div>
+      )}
       {/* Header Bar with Mode Toggle */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[#0A0F1C]/80 border border-white/10 rounded-2xl p-6 backdrop-blur-md">
         <div>
@@ -185,7 +133,7 @@ export default function Triage({ user }: any) {
                 sourceFilter === 'radar' ? 'bg-ghi-teal/20 text-ghi-teal border border-ghi-teal/40' : 'text-slate-400 hover:text-white'
               }`}
             >
-              <Globe className="w-3.5 h-3.5" /> Global Radar
+              <Globe className="w-3.5 h-3.5" /> Radar
             </button>
             <button
               onClick={() => setSourceFilter('listener')}
@@ -230,18 +178,18 @@ export default function Triage({ user }: any) {
         <select
           value={diseaseFilter}
           onChange={(e) => setDiseaseFilter(e.target.value)}
-          className="bg-ghi-navy border-white/10 text-[11px] font-bold text-slate-300 rounded-xl px-4 py-2 outline-none uppercase cursor-pointer hover:bg-white/5"
+          className="bg-ghi-navy border-white/10 text-[11px] font-bold text-slate-300 rounded-xl px-4 py-2 outline-none uppercase cursor-pointer hover:bg-slate-900"
         >
-          <option>ALL DISEASES</option>
-          {uniqueDiseases.map(d => <option key={d} value={d}>{d}</option>)}
+          <option className="bg-slate-900 text-white">ALL DISEASES</option>
+          {uniqueDiseases.map(d => <option key={d} value={d} className="bg-slate-900 text-white">{d}</option>)}
         </select>
         <select
           value={regionFilter}
           onChange={(e) => setRegionFilter(e.target.value)}
-          className="bg-ghi-navy border-white/10 text-[11px] font-bold text-slate-300 rounded-xl px-4 py-2 outline-none uppercase cursor-pointer hover:bg-white/5"
+          className="bg-ghi-navy border-white/10 text-[11px] font-bold text-slate-300 rounded-xl px-4 py-2 outline-none uppercase cursor-pointer hover:bg-slate-900"
         >
-          <option>ALL REGIONS</option>
-          {uniqueRegions.map(r => <option key={r} value={r}>{r}</option>)}
+          <option className="bg-slate-900 text-white">ALL REGIONS</option>
+          {uniqueRegions.map(r => <option key={r} value={r} className="bg-slate-900 text-white">{r}</option>)}
         </select>
       </div>
 
@@ -274,7 +222,7 @@ export default function Triage({ user }: any) {
                     <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
                       signal.sourceOrigin === 'listener' ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40' : 'bg-ghi-teal/20 text-ghi-teal border border-ghi-teal/40'
                     }`}>
-                      {signal.sourceOrigin === 'listener' ? 'Social Listener' : 'Global Radar'}
+                      {signal.sourceOrigin === 'listener' ? 'Listener' : 'Radar'}
                     </span>
                     {signal.sourceName && (
                       <span className="text-[10px] text-slate-400 font-medium">via {signal.sourceName}</span>
@@ -318,7 +266,7 @@ export default function Triage({ user }: any) {
                   <button
                     disabled={!canAction || isProcessing}
                     onClick={() => handleAction(signal.id, 'reject')}
-                    className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-ghi-critical/20 text-slate-300 hover:text-ghi-critical text-[11px] font-black uppercase tracking-widest border border-white/10 transition-all flex items-center justify-center gap-1.5"
+                    className="flex-1 py-2.5 rounded-xl bg-slate-900 hover:bg-ghi-critical/20 text-slate-300 hover:text-ghi-critical text-[11px] font-black uppercase tracking-widest border border-white/10 transition-all flex items-center justify-center gap-1.5"
                   >
                     <XCircle className="w-4 h-4" /> Reject
                   </button>
@@ -407,7 +355,7 @@ export default function Triage({ user }: any) {
                           <button
                             disabled={!canAction || isProcessing}
                             onClick={() => handleAction(signal.id, 'reject')}
-                            className="px-3 py-1 rounded-lg bg-white/5 hover:bg-ghi-critical/20 text-slate-400 hover:text-ghi-critical text-[10px] font-bold uppercase transition-all"
+                            className="px-3 py-1 rounded-lg bg-slate-900 hover:bg-ghi-critical/20 text-slate-400 hover:text-ghi-critical text-[10px] font-bold uppercase transition-all"
                           >
                             Reject
                           </button>

@@ -152,6 +152,9 @@ export default function GlobalRadarView({ onPromoteToTriage }: GlobalRadarViewPr
    */
   const [windowDays, setWindowDays] = useState<number>(14);
   const [events, setEvents] = useState<RadarEvent[]>([]);
+  // Non-null when the last load failed. The map must never imply data it
+  // does not have.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [sources, setSources] = useState<RadarSource[]>([]);
@@ -166,98 +169,6 @@ export default function GlobalRadarView({ onPromoteToTriage }: GlobalRadarViewPr
   const [zoom, setZoom] = useState(2.8);
   const [center, setCenter] = useState<[number, number]>([35, 20]); // Centered on Middle East / KSA
 
-  const seedEvents: RadarEvent[] = [
-    {
-      id: 'radar-1',
-      sourceId: 'BEACON',
-      sourceName: 'Beacon Bio Intelligence',
-      title: 'Sudden Spike in Cholera Cases Reported in Border Region',
-      disease: 'Cholera',
-      country: 'Yemen',
-      lat: 15.5527,
-      lng: 48.5164,
-      dateReported: '2026-07-28',
-      cases: 420,
-      deaths: 12,
-      cfr: 2.85,
-      summary: 'Acute watery diarrhea surge reported across coastal districts. Regional health authorities requesting emergency rehydration stores.',
-      sourceUrl: 'https://beacon.bio/alerts/yemen-cholera-2026',
-      boardType: 'biological',
-      riskLevel: 'High'
-    },
-    {
-      id: 'radar-2',
-      sourceId: 'WHO',
-      sourceName: 'WHO Disease Outbreak News',
-      title: 'Meningococcal Meningitis Outbreak Cluster',
-      disease: 'Neisseria meningitidis',
-      country: 'Sudan',
-      lat: 12.8628,
-      lng: 30.2176,
-      dateReported: '2026-07-26',
-      cases: 85,
-      deaths: 9,
-      cfr: 10.58,
-      summary: 'Laboratory confirmed cases of Serogroup C meningococcal disease in temporary displaced shelters.',
-      sourceUrl: 'https://www.who.int/emergencies/disease-outbreak-news/item/sudan-meningitis',
-      boardType: 'biological',
-      riskLevel: 'Critical'
-    },
-    {
-      id: 'radar-3',
-      sourceId: 'PROMED',
-      sourceName: 'ProMED-mail Feed',
-      title: 'Unusual Avian Influenza H5N1 Detection in Dairy Livestock',
-      disease: 'Avian Influenza H5N1',
-      country: 'Egypt',
-      lat: 26.8206,
-      lng: 30.8025,
-      dateReported: '2026-07-27',
-      cases: 34,
-      deaths: 0,
-      cfr: 0,
-      summary: 'Mammalian transmission alert triggered. Veterinary surveillance confirming viral clade 2.3.4.4b.',
-      sourceUrl: 'https://promedmail.org/post/20260727.87192',
-      boardType: 'biological',
-      riskLevel: 'High'
-    },
-    {
-      id: 'radar-4',
-      sourceId: 'ECDC',
-      sourceName: 'ECDC Environmental Surveillance',
-      title: 'Chemical Contamination Event in Industrial Canal',
-      disease: 'Toxic Chemical Exposure',
-      country: 'Jordan',
-      lat: 31.9522,
-      lng: 35.2332,
-      dateReported: '2026-07-29',
-      cases: 19,
-      deaths: 0,
-      cfr: 0,
-      summary: 'Industrial solvent release resulting in localized respiratory irritation among nearby residents.',
-      sourceUrl: 'https://ecdc.europa.eu/en/threats-and-outbreaks/jordan-chemical-incident',
-      boardType: 'environmental_cbrn',
-      riskLevel: 'Moderate'
-    },
-    {
-      id: 'radar-5',
-      sourceId: 'WHO_MPOX',
-      sourceName: 'WHO Mpox Global API',
-      title: 'Mpox Clade I Cluster Detection',
-      disease: 'Mpox Clade I',
-      country: 'DR Congo',
-      lat: -4.0383,
-      lng: 21.7587,
-      dateReported: '2026-07-27',
-      cases: 112,
-      deaths: 4,
-      cfr: 3.57,
-      summary: 'Sustained person-to-person transmission identified in endemic outbreak provinces.',
-      sourceUrl: 'https://xmart-api-public.who.int/MPX/V_MPX_VALIDATED_DAILY',
-      boardType: 'biological',
-      riskLevel: 'High'
-    }
-  ];
 
   const fetchSources = async () => {
     try {
@@ -306,11 +217,20 @@ export default function GlobalRadarView({ onPromoteToTriage }: GlobalRadarViewPr
           lat: Number(e.lat) || 20,
           lng: Number(e.lng) || 30
         })));
+        setLoadError(null);
       } else {
-        setEvents(seedEvents);
+        setEvents([]);
+        setLoadError(null);
       }
-    } catch {
-      setEvents(seedEvents);
+    } catch (err) {
+      // This used to fall back to a hardcoded set of invented outbreaks —
+      // cholera in Yemen at 420 cases, meningococcal disease in Sudan — so an
+      // operator whose API was down saw a plausible threat map instead of an
+      // error. On a surveillance platform that is the most dangerous failure
+      // mode there is: it manufactures both reassurance and alarm, and nothing
+      // on screen distinguishes it from real reporting.
+      setEvents([]);
+      setLoadError(err instanceof Error ? err.message : 'Could not reach the surveillance API');
     }
   };
 
@@ -632,9 +552,9 @@ export default function GlobalRadarView({ onPromoteToTriage }: GlobalRadarViewPr
             onChange={e => setDiseaseFilter(e.target.value)}
             className="bg-slate-900 border border-white/10 rounded-xl px-2 py-1 text-xs text-slate-200 focus:border-ghi-teal outline-none"
           >
-            <option value="all">All Diseases</option>
+            <option value="all" className="bg-slate-900 text-white">All Diseases</option>
             {uniqueDiseases.map((d, i) => (
-              <option key={i} value={d}>{d}</option>
+              <option key={i} value={d} className="bg-slate-900 text-white">{d}</option>
             ))}
           </select>
 
@@ -644,11 +564,11 @@ export default function GlobalRadarView({ onPromoteToTriage }: GlobalRadarViewPr
             onChange={e => setRiskFilter(e.target.value)}
             className="bg-slate-900 border border-white/10 rounded-xl px-2 py-1 text-xs text-slate-200 focus:border-ghi-teal outline-none"
           >
-            <option value="all">All Severities</option>
-            <option value="Critical">Critical Only</option>
-            <option value="High">High Only</option>
-            <option value="Moderate">Moderate Only</option>
-            <option value="Low">Low Only</option>
+            <option value="all" className="bg-slate-900 text-white">All Severities</option>
+            <option value="Critical" className="bg-slate-900 text-white">Critical Only</option>
+            <option value="High" className="bg-slate-900 text-white">High Only</option>
+            <option value="Moderate" className="bg-slate-900 text-white">Moderate Only</option>
+            <option value="Low" className="bg-slate-900 text-white">Low Only</option>
           </select>
 
           {/*
@@ -979,6 +899,22 @@ export default function GlobalRadarView({ onPromoteToTriage }: GlobalRadarViewPr
       )}
 
       {/* MOVING RSS FEED STRIP UNDER MAP (SHOWN BY DEFAULT) */}
+      {loadError && (
+        <div className="absolute top-24 left-6 right-6 z-40 max-w-xl rounded-2xl border border-ghi-critical/50 bg-ghi-critical/10 p-4 flex items-start gap-3">
+          <svg className="w-5 h-5 text-ghi-critical shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+              d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.84-2.75L13.74 4a2 2 0 00-3.48 0L3.16 16.25A2 2 0 005 19z"/>
+          </svg>
+          <div>
+            <p className="text-[11px] font-black text-ghi-critical uppercase tracking-widest">Surveillance data unavailable</p>
+            <p className="text-[11px] text-slate-300 mt-1">{loadError}</p>
+            <p className="text-[10px] text-slate-500 mt-1">
+              Nothing below is current. This is a connection failure, not an all-clear.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/*
         Legend.
         The map encodes three things at once — severity in colour, corroboration

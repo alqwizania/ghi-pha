@@ -183,9 +183,9 @@ const UserManagement = () => {
                                                 }
                                             })}
                                         >
-                                            <option value="view">VIEW ONLY</option>
-                                            <option value="edit">EDIT ACCESS</option>
-                                            <option value="update">UPDATE ACCESS</option>
+                                            <option value="view" className="bg-slate-900 text-white">VIEW ONLY</option>
+                                            <option value="edit" className="bg-slate-900 text-white">EDIT ACCESS</option>
+                                            <option value="update" className="bg-slate-900 text-white">UPDATE ACCESS</option>
                                         </select>
                                     </div>
                                 ))}
@@ -256,9 +256,9 @@ const UserManagement = () => {
                                             }
                                         })}
                                     >
-                                        <option value="view">VIEW ONLY</option>
-                                        <option value="edit">EDIT ACCESS</option>
-                                        <option value="update">UPDATE ACCESS</option>
+                                        <option value="view" className="bg-slate-900 text-white">VIEW ONLY</option>
+                                        <option value="edit" className="bg-slate-900 text-white">EDIT ACCESS</option>
+                                        <option value="update" className="bg-slate-900 text-white">UPDATE ACCESS</option>
                                     </select>
                                 </div>
                             ))}

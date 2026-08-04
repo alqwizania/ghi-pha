@@ -64,7 +64,7 @@ const SocialSignalCard = ({ signal, onPromote, onDismiss }: any) => {
                         </button>
                         <button
                             onClick={() => onDismiss(signal.id)}
-                            className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[9px] font-black text-slate-400 uppercase tracking-widest transition-all"
+                            className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-white/10 border border-white/10 text-[9px] font-black text-slate-400 uppercase tracking-widest transition-all"
                         >
                             Dismiss
                         </button>
@@ -110,7 +110,7 @@ const SocialSignalCard = ({ signal, onPromote, onDismiss }: any) => {
                             </button>
                             <button
                                 onClick={() => setShowPromoteModal(false)}
-                                className="flex-1 px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-sm font-black text-slate-400 uppercase tracking-widest transition-all"
+                                className="flex-1 px-4 py-3 rounded-xl bg-slate-900 hover:bg-white/10 border border-white/10 text-sm font-black text-slate-400 uppercase tracking-widest transition-all"
                             >
                                 Cancel
                             </button>
@@ -211,11 +211,11 @@ const ListenerView = ({ user }: any) => {
                                 <select
                                     value={selectedAccount}
                                     onChange={(e) => setSelectedAccount(e.target.value)}
-                                    className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm font-bold focus:border-ghi-teal/50 focus:outline-none"
+                                    className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-sm font-bold focus:border-ghi-teal/50 focus:outline-none"
                                 >
-                                    <option value="all">All Accounts</option>
+                                    <option value="all" className="bg-slate-900 text-white">All Accounts</option>
                                     {accounts.map(acc => (
-                                        <option key={acc.id} value={acc.accountHandle}>{acc.accountHandle}</option>
+                                        <option key={acc.id} value={acc.accountHandle} className="bg-slate-900 text-white">{acc.accountHandle}</option>
                                     ))}
                                 </select>
                             </div>
@@ -225,11 +225,11 @@ const ListenerView = ({ user }: any) => {
                                 <select
                                     value={selectedLanguage}
                                     onChange={(e) => setSelectedLanguage(e.target.value)}
-                                    className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm font-bold focus:border-ghi-teal/50 focus:outline-none"
+                                    className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-sm font-bold focus:border-ghi-teal/50 focus:outline-none"
                                 >
-                                    <option value="all">All Languages</option>
-                                    <option value="en">English</option>
-                                    <option value="ar">Arabic</option>
+                                    <option value="all" className="bg-slate-900 text-white">All Languages</option>
+                                    <option value="en" className="bg-slate-900 text-white">English</option>
+                                    <option value="ar" className="bg-slate-900 text-white">Arabic</option>
                                 </select>
                             </div>
                         </div>

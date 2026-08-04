@@ -486,7 +486,7 @@ const AssessmentView = ({ user }: any) => {
                     <button
                         onClick={() => handleSave(false)}
                         disabled={isSaving}
-                        className="flex-1 py-5 bg-white/5 hover:bg-white/10 text-slate-400 font-black text-[11px] rounded-2xl transition-all border border-white/10 uppercase tracking-[0.3em] backdrop-blur-md"
+                        className="flex-1 py-5 bg-slate-900 hover:bg-white/10 text-slate-400 font-black text-[11px] rounded-2xl transition-all border border-white/10 uppercase tracking-[0.3em] backdrop-blur-md"
                     >
                         {isSaving ? 'Synchronizing...' : 'Save Intel Draft'}
                     </button>
