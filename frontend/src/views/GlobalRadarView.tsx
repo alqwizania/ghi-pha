@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup } from 'react-simple-maps';
 import { geoCentroid } from 'd3-geo';
 import { 
@@ -12,11 +12,13 @@ import {
   ZoomIn,
   ZoomOut,
   Maximize2,
+  Minimize2,
+  Crosshair,
   X,
   Rss,
   Search
 } from 'lucide-react';
-import { API_BASE_URL, fetchRadarEvents, fetchRadarSources, triggerRadarScan, promoteRadarEvent } from '../lib/api';
+import { fetchRadarEvents, fetchRadarSources, triggerRadarScan, promoteRadarEvent } from '../lib/api';
 
 const geoUrl = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
@@ -164,6 +166,32 @@ export default function GlobalRadarView({ onPromoteToTriage }: GlobalRadarViewPr
   // Panel Collapsible States (Floating Overlays)
   const [isSourcesOpen, setIsSourcesOpen] = useState(false);
   const [isStreamOpen, setIsStreamOpen] = useState(false);
+  // Collapsed by default. The legend is reference material — needed once while
+  // learning the map, then never again — so it should not permanently occupy a
+  // corner of the operating picture.
+  const [isLegendOpen, setIsLegendOpen] = useState(false);
+  /**
+   * True screen fullscreen, via the browser's own API rather than a CSS
+   * overlay.
+   *
+   * A `fixed inset-0` div was the obvious approach and it did not work: an
+   * ancestor carries backdrop-blur, which makes it a containing block for fixed
+   * descendants, so the "fullscreen" map stopped politely at the sidebar. The
+   * native API sidesteps every stacking question and gives the whole display
+   * rather than the whole viewport — which is what an operator means by
+   * fullscreen on a wall-mounted screen.
+   */
+  const mapRef = useRef<HTMLDivElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  const toggleFullscreen = () => {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else mapRef.current?.requestFullscreen?.();
+  };
+  // Independent agreement is the strongest evidence this system produces, and
+  // filtering to it is the fastest way to separate the confirmed from the
+  // single-sourced.
+  const [corroboratedOnly, setCorroboratedOnly] = useState(false);
 
   // Map Zoom & Center State
   const [zoom, setZoom] = useState(2.8);
@@ -195,10 +223,6 @@ export default function GlobalRadarView({ onPromoteToTriage }: GlobalRadarViewPr
     if ((src.eventsLastExtracted ?? 0) > 0) return 'live';
     return 'quiet';
   };
-
-  const cutoffLabel = scanResult?.cutoffDate
-    ? new Date(scanResult.cutoffDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
-    : 'last 14 days';
 
   const HEALTH_STYLES: Record<string, { dot: string; label: string }> = {
     live: { dot: 'bg-ghi-success shadow-[0_0_6px_#39FF14]', label: 'Live' },
@@ -237,6 +261,14 @@ export default function GlobalRadarView({ onPromoteToTriage }: GlobalRadarViewPr
   useEffect(() => {
     fetchRadarData();
     fetchSources();
+  }, []);
+
+  // The browser owns fullscreen state: Escape and F11 change it without ever
+  // touching our button, so listen rather than assume.
+  useEffect(() => {
+    const onChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener('fullscreenchange', onChange);
+    return () => document.removeEventListener('fullscreenchange', onChange);
   }, []);
 
   const triggerScan = async () => {
@@ -282,6 +314,7 @@ export default function GlobalRadarView({ onPromoteToTriage }: GlobalRadarViewPr
 
   const filteredEvents = events.filter(e => {
     if (String(e.dateReported || '').slice(0, 10) < windowCutoff) return false;
+    if (corroboratedOnly && (e.score?.corroboration ?? 0) < 1) return false;
     if (selectedBoard !== 'all' && e.boardType !== selectedBoard) return false;
     if (diseaseFilter !== 'all' && e.disease !== diseaseFilter) return false;
     if (riskFilter !== 'all' && e.riskLevel !== riskFilter) return false;
@@ -295,6 +328,37 @@ export default function GlobalRadarView({ onPromoteToTriage }: GlobalRadarViewPr
     return true;
   });
 
+  const newestEvent = filteredEvents.length
+    ? filteredEvents.map((e: any) => String(e.dateReported || '').slice(0, 10)).sort().at(-1)
+    : null;
+
+  /**
+   * Daily event counts across the visible window, stacked by severity.
+   *
+   * Built from the same filtered set the map draws, so the curve and the dots
+   * can never disagree. Capped at 90 buckets: beyond that the bars are thinner
+   * than the gaps between them and the shape stops being readable.
+   */
+  const timeline = (() => {
+    const span = Math.min(windowDays, 90);
+    const buckets = new Map<string, { date: string; ageDays: number; critical: number; high: number; other: number; total: number }>();
+    for (let i = span - 1; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+      buckets.set(d, { date: d, ageDays: i + 1, critical: 0, high: 0, other: 0, total: 0 });
+    }
+    for (const e of filteredEvents) {
+      const key = String(e.dateReported || '').slice(0, 10);
+      const b = buckets.get(key);
+      if (!b) continue;
+      if (e.riskLevel === 'Critical') b.critical++;
+      else if (e.riskLevel === 'High') b.high++;
+      else b.other++;
+      b.total++;
+    }
+    const days = [...buckets.values()];
+    return { days, peak: Math.max(1, ...days.map(d => d.total)) };
+  })();
+
   // Countries currently reporting, so their code stays visible at any zoom.
   const eventCountries = new Set<string>(filteredEvents.map((e: any) => e.country));
 
@@ -307,17 +371,14 @@ export default function GlobalRadarView({ onPromoteToTriage }: GlobalRadarViewPr
    * has to be ordered by what deserves the eye: severity first, then recency.
    * Capped at 15 so the loop comes round often enough to be read.
    */
-  const TIER_WEIGHT: Record<string, number> = { Critical: 3, High: 2, Moderate: 1, Low: 0 };
-  const tickerEvents = [...filteredEvents]
-    .filter((e: any) => e.score?.reportsOccurrence !== false)
-    .sort((a: any, b: any) =>
-      (TIER_WEIGHT[b.riskLevel] ?? 0) - (TIER_WEIGHT[a.riskLevel] ?? 0) ||
-      String(b.dateReported || '').localeCompare(String(a.dateReported || ''))
-    )
-    .slice(0, 15);
+
 
   return (
-    <div className="relative w-full h-[calc(100vh-170px)] min-h-[500px] rounded-3xl overflow-hidden border border-white/10 bg-[#060a14] shadow-2xl">
+    <div
+      ref={mapRef}
+      className={isFullscreen
+        ? 'relative w-full h-screen overflow-hidden bg-[#060a14]'
+        : 'relative w-full h-[calc(100vh-170px)] min-h-[500px] rounded-3xl overflow-hidden border border-white/10 bg-[#060a14] shadow-2xl'}>
       
       {/* FULLSCREEN REAL WORLD MAP CANVAS (react-simple-maps) */}
       <div className="absolute inset-0 w-full h-full cursor-grab active:cursor-grabbing">
@@ -526,7 +587,12 @@ export default function GlobalRadarView({ onPromoteToTriage }: GlobalRadarViewPr
               </span>
             </div>
             <p className="text-[9px] text-slate-400 font-bold">
-              Retrospective Window Since: <span className="text-ghi-teal">{cutoffLabel}</span>
+              {/* "Retrospective Window Since: last 14 days" said the same thing
+                  as the window slider, in wording nobody outside the codebase
+                  uses, and the two could drift apart. What an operator wants
+                  here is how much is on the map and how fresh it is. */}
+              <span className="text-ghi-teal">{filteredEvents.length}</span> events shown
+              {newestEvent && <> · newest <span className="text-ghi-teal">{newestEvent}</span></>}
             </p>
           </div>
         </div>
@@ -602,6 +668,24 @@ export default function GlobalRadarView({ onPromoteToTriage }: GlobalRadarViewPr
               {filteredEvents.length}
             </span>
           </div>
+
+          {/* Corroboration. Two independent sources reporting the same event is
+              the strongest evidence event-based surveillance produces, and this
+              is the quickest way to separate the confirmed from the rumoured. */}
+          <button
+            onClick={() => setCorroboratedOnly(v => !v)}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider border transition-all ${
+              corroboratedOnly
+                ? 'bg-ghi-teal/20 text-ghi-teal border-ghi-teal/40'
+                : 'bg-white/5 text-slate-400 border-white/10 hover:text-white'}`}
+            title="Only events reported by more than one independent source"
+          >
+            <span className="text-[11px] leading-none">✦</span> Corroborated
+          </button>
+
+          {/* Corroboration. Two independent sources reporting the same event is
+              the strongest evidence event-based surveillance produces, and this
+              is the quickest way to separate the confirmed from the rumoured. */}
 
           {/* Board Category Pill Tabs */}
           <div className="flex items-center gap-1 border-l border-white/10 pl-2">
@@ -687,8 +771,10 @@ export default function GlobalRadarView({ onPromoteToTriage }: GlobalRadarViewPr
         </div>
       )}
 
-      {/* FLOATING ACTION ICON BUTTONS (LEFT SIDE - POSITIONED ABOVE RSS TICKER) */}
-      <div className="absolute left-6 bottom-16 flex flex-row md:flex-col gap-2 z-30">
+      {/* Drawer triggers, clearing the timeline strip below them. The old
+          offset assumed the single-line RSS ticker; the histogram is taller and
+          the two overlapped. */}
+      <div className="absolute left-6 bottom-[124px] flex flex-row md:flex-col gap-2 z-30">
         
         {/* Toggle 45 Sources Monitor Drawer */}
         <button
@@ -724,7 +810,7 @@ export default function GlobalRadarView({ onPromoteToTriage }: GlobalRadarViewPr
       </div>
 
       {/* FLOATING MAP ZOOM CONTROLS (Right Side - Above RSS Ticker) */}
-      <div className="absolute right-6 bottom-16 flex flex-col gap-2 z-30">
+      <div className="absolute right-6 bottom-[124px] flex flex-col gap-2 z-30">
         <button
           onClick={handleZoomIn}
           className="p-2.5 rounded-2xl bg-slate-950/90 backdrop-blur-xl border border-white/10 text-slate-300 hover:text-ghi-teal hover:border-ghi-teal/40 transition-all shadow-2xl"
@@ -744,7 +830,19 @@ export default function GlobalRadarView({ onPromoteToTriage }: GlobalRadarViewPr
           className="p-2.5 rounded-2xl bg-slate-950/90 backdrop-blur-xl border border-white/10 text-slate-300 hover:text-ghi-teal hover:border-ghi-teal/40 transition-all shadow-2xl"
           title="Reset Projection"
         >
-          <Maximize2 className="w-4 h-4" />
+          <Crosshair className="w-4 h-4" />
+        </button>
+        {/* Fullscreen. A threat map is the one view where the surrounding
+            navigation is pure cost. Escape returns. */}
+        <button
+          onClick={toggleFullscreen}
+          className={`p-2.5 rounded-2xl backdrop-blur-xl border transition-all shadow-2xl ${
+            isFullscreen
+              ? 'bg-ghi-teal/20 border-ghi-teal/50 text-ghi-teal'
+              : 'bg-slate-950/90 border-white/10 text-slate-300 hover:text-ghi-teal hover:border-ghi-teal/40'}`}
+          title={isFullscreen ? 'Exit fullscreen (Esc)' : 'Fullscreen map'}
+        >
+          {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
         </button>
       </div>
 
@@ -923,7 +1021,28 @@ export default function GlobalRadarView({ onPromoteToTriage }: GlobalRadarViewPr
         someone or invented their own reading of it, and a wrong reading of a
         threat map is worse than no map.
       */}
-      <div className="absolute top-24 right-4 z-30 bg-slate-950/85 backdrop-blur-xl border border-white/10 rounded-2xl px-4 py-3 shadow-2xl hidden md:block">
+      <div className="absolute top-24 right-4 z-30 hidden md:block">
+        <button
+          onClick={() => setIsLegendOpen(v => !v)}
+          className={`flex items-center gap-2 backdrop-blur-xl border rounded-2xl px-3 py-2 shadow-2xl text-[9px] font-black uppercase tracking-[0.2em] transition-all ${
+            isLegendOpen
+              ? 'bg-ghi-teal/15 border-ghi-teal/40 text-ghi-teal'
+              : 'bg-slate-950/85 border-white/10 text-slate-400 hover:text-ghi-teal hover:border-ghi-teal/40'}`}
+          title="What the colours and rings mean"
+        >
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          Legend
+        </button>
+      </div>
+
+      {/* Collapsed by default: reference material, needed once while learning
+          the map and rarely after, so it should not hold a corner of the
+          operating picture permanently. */}
+      {isLegendOpen && (
+      <div className="absolute top-[124px] right-4 z-30 bg-slate-950/92 backdrop-blur-xl border border-white/10 rounded-2xl px-4 py-3 shadow-2xl hidden md:block animate-in fade-in slide-in-from-top-2 duration-200">
         <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-2.5">Legend</p>
         <div className="space-y-2">
           {[
@@ -953,58 +1072,67 @@ export default function GlobalRadarView({ onPromoteToTriage }: GlobalRadarViewPr
           </div>
         </div>
       </div>
+      )}
 
-      <div className="absolute bottom-4 left-6 right-6 md:right-24 bg-slate-950/90 backdrop-blur-2xl border border-orange-500/30 rounded-2xl p-2 px-3 z-30 shadow-2xl flex items-center gap-3 overflow-hidden">
-        
-        {/* Live RSS Badge */}
-        <div className="flex items-center gap-1.5 shrink-0 px-2.5 py-1 rounded-xl bg-orange-500/20 text-orange-400 border border-orange-500/40 text-[10px] font-black uppercase tracking-wider">
-          <Rss className="w-3.5 h-3.5 animate-pulse" />
-          <span>LIVE RSS FEED</span>
-        </div>
+      {/*
+        Was a scrolling RSS ticker: the same events already plotted on the map,
+        moving. It was motion rather than information, and it occupied the
+        widest strip on the screen.
 
-        <div className="h-4 w-[1px] bg-white/10 shrink-0"></div>
-
-        {/* Scrolling Ticker Container (Pauses on Hover) */}
-        <div className="flex-1 overflow-hidden relative group">
-          <div className="inline-flex gap-8 animate-[marquee_28s_linear_infinite] group-hover:[animation-play-state:paused] whitespace-nowrap text-xs">
-            {tickerEvents.concat(tickerEvents).map((evt, idx) => (
-              <div
-                key={`${evt.id}-${idx}`}
-                onClick={() => setSelectedEvent(evt)}
-                className="inline-flex items-center gap-2 cursor-pointer hover:text-ghi-teal transition-colors"
-              >
-                <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase ${
-                  evt.riskLevel === 'Critical' ? 'bg-ghi-critical/20 text-ghi-critical border border-ghi-critical/30'
-                    : evt.riskLevel === 'High' ? 'bg-ghi-warning/20 text-ghi-warning border border-ghi-warning/30'
-                      : 'bg-ghi-teal/20 text-ghi-teal border border-ghi-teal/30'
-                }`}>
-                  {evt.sourceId}
-                </span>
-                <span className="font-bold text-white">{evt.disease} ({evt.country}):</span>
-                <span className="text-slate-300 font-medium">{evt.title}</span>
-                {(evt.cases ?? 0) > 0 && (
-                  <span className="text-slate-400 text-[10px] tabular-nums">
-                    [{evt.cases} cases{(evt.deaths ?? 0) > 0 ? `, ${evt.deaths} deaths` : ''}]
-                  </span>
-                )}
-                {(evt.score?.corroboration ?? 0) > 0 && (
-                  <span className="text-ghi-teal/80 text-[10px] font-black">✦ corroborated</span>
-                )}
-                <span className="text-white/20 mx-2">•</span>
-              </div>
-            ))}
+        A daily histogram earns that space. It answers the question a map cannot
+        — is this accelerating? — and it gives the window slider meaning, since
+        widening it now visibly extends the curve instead of only changing a
+        number. Bars are stacked by severity, and clicking one narrows the
+        window to that day.
+      */}
+      <div className="absolute bottom-4 left-6 right-6 md:right-24 bg-slate-950/90 backdrop-blur-2xl border border-white/10 rounded-2xl px-4 py-2.5 z-30 shadow-2xl pointer-events-auto">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <Rss className="w-3 h-3 text-ghi-teal" />
+            <span className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">
+              Reporting Timeline
+            </span>
+            <span className="text-[9px] text-slate-600">
+              {filteredEvents.length} events over {windowDays >= 200 ? 'all records' : `${windowDays} days`}
+            </span>
           </div>
+          {timeline.peak > 0 && (
+            <span className="text-[9px] text-slate-600 tabular-nums">peak {timeline.peak}/day</span>
+          )}
         </div>
 
-        {/* RSS XML Link */}
-        <a
-          href={`${API_BASE_URL}/api/radar/rss`}
-          target="_blank"
-          rel="noreferrer"
-          className="shrink-0 text-[10px] font-bold text-orange-400 hover:text-white underline uppercase ml-1"
-        >
-          XML
-        </a>
+        {/* items-stretch, not items-end: with items-end each bar sizes to its
+            content, so the percentage heights below resolve against zero and
+            every bar renders 0px tall. */}
+        <div className="flex items-stretch gap-[2px] h-14">
+          {timeline.days.map(d => (
+            <button
+              key={d.date}
+              onClick={() => setWindowDays(Math.max(1, d.ageDays))}
+              title={`${d.date} — ${d.total} event${d.total === 1 ? '' : 's'}${d.critical ? `, ${d.critical} critical` : ''}`}
+              className="flex-1 min-w-[2px] h-full flex flex-col justify-end gap-[1px] group"
+            >
+              {d.critical > 0 && (
+                <div className="w-full bg-ghi-critical rounded-sm group-hover:opacity-70 transition-opacity"
+                  style={{ height: `${Math.max(6, (d.critical / timeline.peak) * 100)}%` }} />
+              )}
+              {d.high > 0 && (
+                <div className="w-full bg-ghi-warning rounded-sm group-hover:opacity-70 transition-opacity"
+                  style={{ height: `${Math.max(6, (d.high / timeline.peak) * 100)}%` }} />
+              )}
+              {d.other > 0 && (
+                <div className="w-full bg-ghi-teal/70 rounded-sm group-hover:opacity-70 transition-opacity"
+                  style={{ height: `${Math.max(6, (d.other / timeline.peak) * 100)}%` }} />
+              )}
+              {d.total === 0 && <div className="w-full h-[2px] bg-white/5 rounded-sm" />}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex justify-between mt-1.5 text-[8px] text-slate-600 tabular-nums">
+          <span>{timeline.days[0]?.date}</span>
+          <span>today</span>
+        </div>
       </div>
     </div>
   );
