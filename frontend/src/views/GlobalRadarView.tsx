@@ -84,6 +84,22 @@ interface RadarEvent {
   boardType: 'biological' | 'environmental_cbrn';
   riskLevel: 'Critical' | 'High' | 'Moderate' | 'Low';
   isPromoted?: boolean;
+  /**
+   * The IHR scoring attached by /api/radar/events. `corroboration` is how many
+   * *other* independent sources report the same disease and country — the
+   * strongest evidence this system produces, and untyped here until now, which
+   * is why the map had no way to show it.
+   */
+  score?: {
+    tier: 'critical' | 'high' | 'moderate' | 'routine';
+    domainsAtTwo: number;
+    mandatoryIhr: boolean;
+    confidence: 'high' | 'medium' | 'low';
+    reportsOccurrence: boolean;
+    corroboration?: number;
+    credibility?: number;
+    confidenceScore?: number;
+  } | null;
 }
 
 // Result of POST /api/radar/scan. `degraded` lists sources that failed to
@@ -347,6 +363,24 @@ export default function GlobalRadarView({ onPromoteToTriage }: GlobalRadarViewPr
   // Countries currently reporting, so their code stays visible at any zoom.
   const eventCountries = new Set<string>(filteredEvents.map((e: any) => e.country));
 
+  /**
+   * The ticker carries emergent news, not a recital of the map.
+   *
+   * It previously scrolled every filtered event twice over, which meant a
+   * routine item from three weeks ago moved past at the same weight as a
+   * critical one reported this morning. A feed whose job is to catch the eye
+   * has to be ordered by what deserves the eye: severity first, then recency.
+   * Capped at 15 so the loop comes round often enough to be read.
+   */
+  const TIER_WEIGHT: Record<string, number> = { Critical: 3, High: 2, Moderate: 1, Low: 0 };
+  const tickerEvents = [...filteredEvents]
+    .filter((e: any) => e.score?.reportsOccurrence !== false)
+    .sort((a: any, b: any) =>
+      (TIER_WEIGHT[b.riskLevel] ?? 0) - (TIER_WEIGHT[a.riskLevel] ?? 0) ||
+      String(b.dateReported || '').localeCompare(String(a.dateReported || ''))
+    )
+    .slice(0, 15);
+
   return (
     <div className="relative w-full h-[calc(100vh-170px)] min-h-[500px] rounded-3xl overflow-hidden border border-white/10 bg-[#060a14] shadow-2xl">
       
@@ -441,6 +475,7 @@ export default function GlobalRadarView({ onPromoteToTriage }: GlobalRadarViewPr
               // the original 8px markers were. The transparent hit area below
               // does the rest, so the visible dot never has to grow to be
               // usable.
+              const corroborated = evt.score?.corroboration ?? 0;
               const accent = isCritical
                 ? { colour: '#FF3131', core: 5.0, ring: 13 }
                 : evt.riskLevel === 'High'
@@ -500,6 +535,29 @@ export default function GlobalRadarView({ onPromoteToTriage }: GlobalRadarViewPr
                         strokeWidth={0.8} opacity={0.9} />
                     )}
 
+                    {/*
+                      Corroboration: a second ring for events more than one
+                      independent source reports. Independent agreement is the
+                      strongest evidence event-based surveillance produces, and
+                      it was being computed, stored, and shown to nobody.
+
+                      Deliberately a ring rather than a colour or a size change
+                      — severity already owns colour and size, and confidence is
+                      a separate axis from how bad something is. A corroborated
+                      Moderate and an uncorroborated Critical must stay
+                      distinguishable at a glance.
+                    */}
+                    {corroborated > 0 && (
+                      <circle
+                        r={accent.core + 2.6}
+                        fill="none"
+                        stroke="#ffffff"
+                        strokeWidth={0.7}
+                        opacity={0.55}
+                        strokeDasharray="1.5 1.5"
+                      />
+                    )}
+
                     {/* Invisible hit area. Clicking a marker on a world map is
                         a fine-motor task, so the target is larger than the dot
                         rather than the dot being drawn larger than it needs. */}
@@ -507,7 +565,8 @@ export default function GlobalRadarView({ onPromoteToTriage }: GlobalRadarViewPr
 
                     {/* Native tooltip on hover — reading a marker should not
                         require selecting it and losing the current selection. */}
-                    <title>{`${evt.disease} — ${evt.country}${evt.cases ? ` · ${evt.cases} cases` : ''}`}</title>
+                    <title>{`${evt.disease} — ${evt.country}${evt.cases ? ` · ${evt.cases} cases` : ''}` +
+                      `${corroborated > 0 ? ` · corroborated by ${corroborated} other source${corroborated === 1 ? '' : 's'}` : ' · single source'}`}</title>
                   </g>
                 </Marker>
               );
@@ -873,6 +932,45 @@ export default function GlobalRadarView({ onPromoteToTriage }: GlobalRadarViewPr
       )}
 
       {/* MOVING RSS FEED STRIP UNDER MAP (SHOWN BY DEFAULT) */}
+      {/*
+        Legend.
+        The map encodes three things at once — severity in colour, corroboration
+        in a dashed ring, the Kingdom in a highlighted border — and none of it
+        was written down anywhere. An operator either learned the code from
+        someone or invented their own reading of it, and a wrong reading of a
+        threat map is worse than no map.
+      */}
+      <div className="absolute top-24 right-4 z-30 bg-slate-950/85 backdrop-blur-xl border border-white/10 rounded-2xl px-4 py-3 shadow-2xl hidden md:block">
+        <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-2.5">Legend</p>
+        <div className="space-y-2">
+          {[
+            { colour: '#FF3131', label: 'Critical — 3+ IHR domains' },
+            { colour: '#FFB020', label: 'High — 2 IHR domains' },
+            { colour: '#00F2FF', label: 'Moderate / routine' },
+          ].map(k => (
+            <div key={k.label} className="flex items-center gap-2.5">
+              <svg width="14" height="14" className="shrink-0">
+                <circle cx="7" cy="7" r="3.4" fill={k.colour} stroke="#060a14" strokeWidth="0.5" />
+              </svg>
+              <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap">{k.label}</span>
+            </div>
+          ))}
+          <div className="flex items-center gap-2.5 pt-1.5 border-t border-white/5">
+            <svg width="14" height="14" className="shrink-0">
+              <circle cx="7" cy="7" r="3.4" fill="#00F2FF" />
+              <circle cx="7" cy="7" r="5.6" fill="none" stroke="#ffffff" strokeWidth="0.8" opacity="0.6" strokeDasharray="1.5 1.5" />
+            </svg>
+            <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap">Corroborated — 2+ sources</span>
+          </div>
+          <div className="flex items-center gap-2.5">
+            <svg width="14" height="14" className="shrink-0">
+              <rect x="1.5" y="3" width="11" height="8" rx="1.5" fill="#0c2438" stroke="#00F2FF" strokeWidth="1" />
+            </svg>
+            <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap">Kingdom of Saudi Arabia</span>
+          </div>
+        </div>
+      </div>
+
       <div className="absolute bottom-4 left-6 right-6 md:right-24 bg-slate-950/90 backdrop-blur-2xl border border-orange-500/30 rounded-2xl p-2 px-3 z-30 shadow-2xl flex items-center gap-3 overflow-hidden">
         
         {/* Live RSS Badge */}
@@ -886,20 +984,29 @@ export default function GlobalRadarView({ onPromoteToTriage }: GlobalRadarViewPr
         {/* Scrolling Ticker Container (Pauses on Hover) */}
         <div className="flex-1 overflow-hidden relative group">
           <div className="inline-flex gap-8 animate-[marquee_28s_linear_infinite] group-hover:[animation-play-state:paused] whitespace-nowrap text-xs">
-            {filteredEvents.concat(filteredEvents).map((evt, idx) => (
+            {tickerEvents.concat(tickerEvents).map((evt, idx) => (
               <div
                 key={`${evt.id}-${idx}`}
                 onClick={() => setSelectedEvent(evt)}
                 className="inline-flex items-center gap-2 cursor-pointer hover:text-ghi-teal transition-colors"
               >
                 <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase ${
-                  evt.riskLevel === 'Critical' ? 'bg-ghi-critical/20 text-ghi-critical border border-ghi-critical/30' : 'bg-ghi-teal/20 text-ghi-teal border border-ghi-teal/30'
+                  evt.riskLevel === 'Critical' ? 'bg-ghi-critical/20 text-ghi-critical border border-ghi-critical/30'
+                    : evt.riskLevel === 'High' ? 'bg-ghi-warning/20 text-ghi-warning border border-ghi-warning/30'
+                      : 'bg-ghi-teal/20 text-ghi-teal border border-ghi-teal/30'
                 }`}>
                   {evt.sourceId}
                 </span>
                 <span className="font-bold text-white">{evt.disease} ({evt.country}):</span>
                 <span className="text-slate-300 font-medium">{evt.title}</span>
-                <span className="text-slate-400 text-[10px]">[{evt.cases} Cases]</span>
+                {(evt.cases ?? 0) > 0 && (
+                  <span className="text-slate-400 text-[10px] tabular-nums">
+                    [{evt.cases} cases{(evt.deaths ?? 0) > 0 ? `, ${evt.deaths} deaths` : ''}]
+                  </span>
+                )}
+                {(evt.score?.corroboration ?? 0) > 0 && (
+                  <span className="text-ghi-teal/80 text-[10px] font-black">✦ corroborated</span>
+                )}
                 <span className="text-white/20 mx-2">•</span>
               </div>
             ))}

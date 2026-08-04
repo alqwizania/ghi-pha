@@ -75,16 +75,19 @@ app.use('*', cors({
     maxAge: 86400,
 }));
 
-// Endpoints reachable without a session. The RSS feed is deliberately open —
-// it is a syndication endpoint carrying only already-public outbreak data, and
-// feed readers cannot present a bearer token.
+// Endpoints reachable without a session.
+//
+// The RSS feed used to be here, justified as carrying only already-public
+// outbreak data. That stopped being true once scoring landed: the feed emits
+// "Risk Level: Critical", which is PHA's own classification rather than
+// anything the source published, and anyone finding the URL could quote it as
+// the Authority's position. This platform is for PHA staff, so the feed
+// requires a session like everything else.
 const PUBLIC_PATHS = new Set([
     '/',
     '/health',
     '/api/v1/ping',
     '/api/v1/auth/login',
-    '/api/radar/rss',
-    '/api/v1/radar/rss',
 ]);
 
 app.use('*', async (c, next) => {
@@ -700,6 +703,13 @@ app.get('/api/radar/events', async (c) => {
                         mandatoryIhr: r.event_scores.mandatoryIhr,
                         confidence: r.event_scores.confidence,
                         reportsOccurrence: r.event_scores.reportsOccurrence,
+                        // How many independent sources report this event. It is
+                        // the strongest evidence event-based surveillance
+                        // produces and was being computed, stored, and then
+                        // never shown to anyone.
+                        corroboration: r.event_scores.corroboration,
+                        credibility: r.event_scores.credibility,
+                        confidenceScore: r.event_scores.confidenceScore,
                         evidence: r.event_scores.evidence,
                     }
                     : null,
