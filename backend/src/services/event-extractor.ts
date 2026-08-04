@@ -38,6 +38,12 @@ export interface ExtractionOutcome {
     detail: string;
     inputTokens?: number;
     outputTokens?: number;
+    /** Which model ran, for cost accounting. */
+    model?: string;
+    /** Feed entries skipped as already-read or not health-related. */
+    itemsSkipped?: number;
+    /** Identities of the feed entries actually sent, so they are not sent twice. */
+    presentedItems?: string[];
 }
 
 const EXTRACTION_SCHEMA = {
@@ -158,6 +164,74 @@ export function trimFeedItems(xml: string, maxItems = 40): string {
 }
 
 /**
+ * Extraction model.
+ *
+ * Reading "which disease, which country, how many cases" out of cleaned text is
+ * not a frontier-model task, and running one over every source on every scan is
+ * where the cost went: 34 sources at roughly 10k input tokens each is ~$3 a pass
+ * on Opus, or about $1,000/month on a two-hourly cron.
+ *
+ * Haiku is 5x cheaper on both directions and does this job. A source that
+ * genuinely needs more can set `config.model` in the registry — WHO EMRO was
+ * the case that justified keeping a stronger model available, since a weaker
+ * one merged the Saudi-specific MERS figures into the global total, and for a
+ * Saudi health authority that is the row that matters.
+ */
+export const DEFAULT_EXTRACTION_MODEL = 'claude-haiku-4-5';
+
+/**
+ * Terms that make an item worth a model call.
+ *
+ * A deliberately generous net applied to feed items before extraction: it costs
+ * nothing to run, and the model still decides what is a real event. The point
+ * is only to avoid paying to be told that a press release about a building
+ * opening is not an outbreak. Anything ambiguous is kept — a false negative
+ * here is a missed signal, which is far more expensive than a wasted token.
+ */
+const RELEVANCE_TERMS = [
+    'outbreak', 'case', 'cases', 'death', 'deaths', 'infect', 'disease', 'virus', 'viral',
+    'bacter', 'epidemic', 'pandemic', 'cluster', 'surveillance', 'transmission', 'vaccine',
+    'vaccination', 'immuni', 'fever', 'influenza', 'flu', 'cholera', 'measles', 'polio',
+    'ebola', 'mpox', 'monkeypox', 'malaria', 'dengue', 'zika', 'covid', 'sars', 'mers',
+    'coronavirus', 'hepatitis', 'meningit', 'diphther', 'pertussis', 'rabies', 'plague',
+    'anthrax', 'botulism', 'salmonell', 'listeri', 'e. coli', 'coli', 'norovirus', 'rotavirus',
+    'tuberculosis', 'hiv', 'aids', 'yellow fever', 'chikungunya', 'nipah', 'lassa', 'marburg',
+    'hantavirus', 'legionell', 'typhoid', 'shigell', 'campylobact', 'brucell', 'leptospir',
+    'schistosom', 'trachoma', 'leishman', 'trypanosom', 'poison', 'contaminat', 'foodborne',
+    'waterborne', 'zoonotic', 'avian', 'h5n1', 'h7n9', 'h9n2', 'antimicrobial', 'resistance',
+    'quarantine', 'epidemiolog', 'morbidit', 'mortalit', 'health emergency', 'public health',
+    'who', 'alert', 'notifiable', 'screwworm', 'cyclospor', 'illness', 'sick', 'hospitali',
+];
+
+export function looksRelevant(text: string): boolean {
+    const t = text.toLowerCase();
+    return RELEVANCE_TERMS.some((term) => t.includes(term));
+}
+
+/**
+ * Splits a feed into individual items so each can be hashed and skipped once
+ * seen.
+ *
+ * This is the change that actually moves the bill. Page-level hashing means one
+ * new headline on a forty-item feed re-extracts all forty, every time, and
+ * busy sources change most scans. Feeds are structured enough to split for
+ * free, so the model only ever sees entries the system has not already read.
+ */
+export function splitFeedIntoItems(xml: string): string[] {
+    const matches = [...xml.matchAll(/<(item|entry)[\s>][\s\S]*?<\/\1>/gi)];
+    return matches.map((m) => m[0]);
+}
+
+/** Stable identity for a feed item: its guid or link, else the whole entry. */
+export function itemIdentity(item: string): string {
+    const guid = item.match(/<guid[^>]*>([\s\S]*?)<\/guid>/i)?.[1]
+        ?? item.match(/<link[^>]*>([\s\S]*?)<\/link>/i)?.[1]
+        ?? item.match(/<link[^>]*href=["']([^"']+)["']/i)?.[1];
+    const key = (guid ?? item).replace(/<!\[CDATA\[|\]\]>/g, '').trim();
+    return key.slice(0, 500);
+}
+
+/**
  * Splits content into two halves for a retry after a truncated response.
  *
  * Feeds split on an item boundary so neither half cuts an entry down the
@@ -220,20 +294,62 @@ export function htmlToText(html: string, maxChars = 40000): string {
  */
 export async function extractEvents(
     apiKey: string | undefined,
-    source: { id: string; name: string; url: string },
+    source: { id: string; name: string; url: string; config?: unknown },
     rawContent: string,
-    isHtml: boolean
+    isHtml: boolean,
+    /** Item identities already extracted from this source; skipped if given. */
+    seenItems?: Set<string>
 ): Promise<ExtractionOutcome> {
     if (!apiKey) {
         return { events: [], status: 'no_key', detail: 'ANTHROPIC_API_KEY is not configured' };
     }
 
-    const content = isHtml ? htmlToText(rawContent) : trimFeedItems(rawContent).slice(0, 40000);
+    const model = (source.config as { model?: string } | undefined)?.model || DEFAULT_EXTRACTION_MODEL;
+
+    let content: string;
+    let skipped = 0;
+    let presentedItems: string[] | undefined;
+
+    if (isHtml) {
+        content = htmlToText(rawContent);
+    } else {
+        // Feed path: drop entries already read, and entries with no health
+        // vocabulary at all, before spending anything on them.
+        const items = splitFeedIntoItems(rawContent);
+        if (items.length === 0) {
+            content = trimFeedItems(rawContent).slice(0, 40000);
+        } else {
+            const fresh: string[] = [];
+            const presented: string[] = [];
+            for (const item of items) {
+                if (seenItems?.has(itemIdentity(item))) { skipped++; continue; }
+                if (!looksRelevant(item)) { skipped++; continue; }
+                fresh.push(item);
+                presented.push(itemIdentity(item));
+                if (fresh.length >= 40) break;
+            }
+            if (fresh.length === 0) {
+                return {
+                    events: [],
+                    status: 'ok',
+                    detail: `no new items (${skipped} already read or not health-related)`,
+                    inputTokens: 0,
+                    outputTokens: 0,
+                    model,
+                    itemsSkipped: skipped,
+                };
+            }
+            content = fresh.join('\n').slice(0, 40000);
+            presentedItems = presented;
+        }
+    }
+
     if (content.trim().length < 40) {
         return { events: [], status: 'ok', detail: 'source content was empty after cleaning' };
     }
 
-    return extractFromContent(apiKey, source, content, 0);
+    const outcome = await extractFromContent(apiKey, source, content, 0, model);
+    return { ...outcome, model, itemsSkipped: skipped, presentedItems };
 }
 
 /** How many times a truncated response may be halved and retried. */
@@ -252,14 +368,15 @@ async function extractFromContent(
     apiKey: string,
     source: { id: string; name: string; url: string },
     content: string,
-    depth: number
+    depth: number,
+    model: string
 ): Promise<ExtractionOutcome> {
 
     const client = new Anthropic({ apiKey });
 
     try {
         const response = await client.messages.create({
-            model: 'claude-opus-5',
+            model,
             max_tokens: 16000,
             system: SYSTEM_PROMPT,
             // Effort is left at the default deliberately. Dropping it to 'low'
@@ -303,8 +420,8 @@ async function extractFromContent(
             }
 
             const [first, second] = await Promise.all([
-                extractFromContent(apiKey, source, halves[0], depth + 1),
-                extractFromContent(apiKey, source, halves[1], depth + 1),
+                extractFromContent(apiKey, source, halves[0], depth + 1, model),
+                extractFromContent(apiKey, source, halves[1], depth + 1, model),
             ]);
 
             // A half that fails does not discard the half that worked; the

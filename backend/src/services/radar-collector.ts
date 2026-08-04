@@ -1,4 +1,4 @@
-import { surveillanceSources, sourceSnapshots, radarEvents, signals, eventScores, signalLinks } from '../db/schema';
+import { surveillanceSources, sourceSnapshots, radarEvents, signals, eventScores, signalLinks, seenItems } from '../db/schema';
 import { scoreEvent, shouldAutoPromote, SCORER_VERSION, type CountBasis, type DiseaseBaseline, type EpiIndicators, type ScoreResult } from './signal-scoring';
 import { eq, and, gte, gt, isNull, or, sql } from 'drizzle-orm';
 import { extractEvents } from './event-extractor';
@@ -254,6 +254,14 @@ interface SourceResult {
   events: ParsedEvent[];
   status: DiagnosticStatus;
   detail: string;
+  /** Present for model-extracted sources. Recorded so spend is visible per source. */
+  usage?: {
+    inputTokens: number;
+    outputTokens: number;
+    model?: string;
+    itemsSkipped: number;
+    presentedItems?: string[];
+  };
 }
 
 function ok(sourceId: string, events: ParsedEvent[], totalBeforeFilter: number): SourceResult {
@@ -707,10 +715,16 @@ export async function initializeSources(db: any) {
 async function parseWithModel(
   source: RegisteredSource,
   body: string,
-  apiKey: string | undefined
+  apiKey: string | undefined,
+  seenItems?: Set<string>
 ): Promise<SourceResult> {
-  const isHtml = source.fetchStrategy !== 'json';
-  const outcome = await extractEvents(apiKey, source, body, isHtml);
+  // Only genuine HTML goes through the text stripper. This read
+  // `!== 'json'`, which sent RSS down the HTML path — so the feed handling
+  // (item trimming, and now per-item skipping) only ever applied to JSON
+  // sources, and CDC kept overrunning the token ceiling despite the trim
+  // that was added to stop exactly that.
+  const isHtml = source.fetchStrategy === 'html';
+  const outcome = await extractEvents(apiKey, source, body, isHtml, seenItems);
 
   if (outcome.status === 'no_key') {
     const fallback = parseHTMLTitles(source.id, source.name, source.url, body);
@@ -762,20 +776,30 @@ async function parseWithModel(
     });
   }
 
-  return ok(source.id, events, outcome.events.length);
+  return {
+    ...ok(source.id, events, outcome.events.length),
+    usage: {
+      inputTokens: outcome.inputTokens ?? 0,
+      outputTokens: outcome.outputTokens ?? 0,
+      model: outcome.model,
+      itemsSkipped: outcome.itemsSkipped ?? 0,
+      presentedItems: outcome.presentedItems,
+    },
+  };
 }
 
 async function parseSource(
   source: RegisteredSource,
   body: string,
-  apiKey: string | undefined
+  apiKey: string | undefined,
+  seenItems?: Set<string>
 ): Promise<SourceResult> {
   // Every parser drops events outside the window, so they all need the source's
   // own window rather than the global default.
   const cutoff = cutoffForSource(source);
   switch (source.parserHint) {
     case 'ai':
-      return parseWithModel(source, body, apiKey);
+      return parseWithModel(source, body, apiKey, seenItems);
     case 'who_dons':
       return parseWHO_DONs(body, cutoff);
     case 'who_mpox':
@@ -878,6 +902,21 @@ export async function fetchGlobalRadarScan(db?: any, env?: any, options: { force
     registered.map((s: any) => [s.id, cutoffForSource(s)])
   );
 
+  // Feed entries already put in front of the model. This is what turns "the
+  // page changed, re-read all forty items" into "re-read the two that are new".
+  const seenBySource = new Map<string, Set<string>>();
+  try {
+    const rows = await db.select().from(seenItems);
+    for (const row of rows as Array<{ sourceId: string; itemKey: string }>) {
+      let set = seenBySource.get(row.sourceId);
+      if (!set) { set = new Set(); seenBySource.set(row.sourceId, set); }
+      set.add(row.itemKey);
+    }
+  } catch (err) {
+    // Losing this costs money, not correctness — every item is simply re-read.
+    console.error('[GHI Radar] Could not load seen items; extracting everything:', err);
+  }
+
   const now = Date.now();
   const due = registered.filter((s: any) => {
     if (options.force) return true;
@@ -920,7 +959,10 @@ export async function fetchGlobalRadarScan(db?: any, env?: any, options: { force
       };
     }
 
-    return { spec, fetchedAt, changed: true, hash, bytes: retrieved.body.length, result: await parseSource(spec, retrieved.body, env?.ANTHROPIC_API_KEY) };
+    return {
+      spec, fetchedAt, changed: true, hash, bytes: retrieved.body.length,
+      result: await parseSource(spec, retrieved.body, env?.ANTHROPIC_API_KEY, seenBySource.get(spec.id)),
+    };
   });
 
   for (const outcome of outcomes) {
@@ -1093,11 +1135,19 @@ export async function fetchGlobalRadarScan(db?: any, env?: any, options: { force
         lastError: healthy ? null : result.detail,
         consecutiveFailures: healthy ? 0 : (prior?.consecutiveFailures ?? 0) + 1,
         eventsLastExtracted: result.events.length,
+        inputTokens: result.usage?.inputTokens ?? 0,
+        outputTokens: result.usage?.outputTokens ?? 0,
+        extractionModel: result.usage?.model ?? null,
+        itemsSkipped: result.usage?.itemsSkipped ?? 0,
         updatedAt: fetchedAt,
       }).onConflictDoUpdate({
         target: sourceSnapshots.sourceId,
         set: {
           contentHash: hashToStore,
+          inputTokens: result.usage?.inputTokens ?? 0,
+          outputTokens: result.usage?.outputTokens ?? 0,
+          extractionModel: result.usage?.model ?? null,
+          itemsSkipped: result.usage?.itemsSkipped ?? 0,
           contentBytes: bytes,
           lastFetchedAt: fetchedAt,
           lastSuccessAt: healthy ? fetchedAt : prior?.lastSuccessAt ?? null,
@@ -1111,6 +1161,19 @@ export async function fetchGlobalRadarScan(db?: any, env?: any, options: { force
       });
     } catch (err) {
       console.error(`[GHI Radar] Snapshot write failed for ${spec.id}:`, err);
+    }
+
+    // Record what the model actually saw, so it is never paid for twice. Only
+    // after a successful pass: a failed extraction has not read anything.
+    const presented = result.usage?.presentedItems;
+    if (healthy && presented?.length) {
+      try {
+        await db.insert(seenItems)
+          .values(presented.map((itemKey) => ({ sourceId: spec.id, itemKey })))
+          .onConflictDoNothing();
+      } catch (err) {
+        console.error(`[GHI Radar] Could not record seen items for ${spec.id}:`, err);
+      }
     }
   }
 

@@ -141,7 +141,23 @@ export const sourceSnapshots = pgTable("source_snapshots", {
     lastError: text("last_error"),
     consecutiveFailures: integer("consecutive_failures").default(0).notNull(),
     eventsLastExtracted: integer("events_last_extracted").default(0).notNull(),
+    // Cost accounting. Token usage was returned by the extractor and dropped,
+    // so the only way to discover spend was a billing alert. See migration 018.
+    inputTokens: integer("input_tokens").default(0),
+    outputTokens: integer("output_tokens").default(0),
+    extractionModel: varchar("extraction_model", { length: 40 }),
+    itemsSkipped: integer("items_skipped").default(0),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// Feed entries already put in front of the model. Page-level hashing meant one
+// new headline re-extracted a whole forty-item feed; this makes a feed cost
+// only its genuinely new entries. See migration 018.
+export const seenItems = pgTable("seen_items", {
+    sourceId: varchar("source_id", { length: 100 })
+        .references(() => surveillanceSources.id, { onDelete: "cascade" }).notNull(),
+    itemKey: varchar("item_key", { length: 500 }).notNull(),
+    firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export const radarEvents = pgTable("radar_events", {
