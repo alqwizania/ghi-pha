@@ -14,7 +14,10 @@ binding = "HYPERDRIVE"
 id = "2c3d595f50c14b81a7ac44cb52a5d40a"
 
 [triggers]
-crons = ["0 */6 * * *"]
+# Twice daily, 06:00 and 18:00 UTC — 09:00 and 21:00 Riyadh. Set at the CEO's
+# request. The retrospective windows are all far wider than 12 hours, so
+# nothing ages out of view between passes.
+crons = ["0 6,18 * * *"]
 
 [observability]
 enabled = true
