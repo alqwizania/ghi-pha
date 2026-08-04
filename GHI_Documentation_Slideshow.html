@@ -1,675 +1,736 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GHI System - Global Health Intelligence Platform Documentation</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          fontFamily: {
-            sans: ['Outfit', 'system-ui', 'sans-serif'],
-            mono: ['JetBrains Mono', 'monospace'],
-          },
-          colors: {
-            ghi: {
-              navy: '#0A0F1C',
-              dark: '#050811',
-              teal: '#00F2FF',
-              critical: '#FF3131',
-              warning: '#F4B400',
-              success: '#39FF14',
-            }
-          }
-        }
-      }
-    }
-  </script>
-  <style>
-    body {
-      background-color: #050811;
-      color: #f1f5f9;
-      font-family: 'Outfit', sans-serif;
-      overflow: hidden;
-    }
-    
-    .glass-card {
-      background: rgba(10, 15, 28, 0.92);
-      backdrop-filter: blur(24px);
-      border: 1px solid rgba(255, 255, 255, 0.15);
-    }
-    
-    .neon-border {
-      box-shadow: 0 0 35px rgba(0, 242, 255, 0.2);
-      border-color: rgba(0, 242, 255, 0.5);
-    }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Global Health Intelligence — Public Health Authority</title>
+<style>
+/* ============================================================
+   Self-contained. No CDN, no webfonts, no network of any kind —
+   this must run from a USB stick in a room with no wifi.
+   ============================================================ */
 
-    .neon-text {
-      text-shadow: 0 0 16px rgba(0, 242, 255, 0.7);
-    }
+:root{
+  --ink:#060a14;
+  --teal:#00F2FF;
+  --critical:#FF3131;
+  --warn:#FFB020;
+  --good:#3DDC97;
+  --line:rgba(255,255,255,.08);
+  --txt:#e8eef7;
+  --dim:#8b9bb4;
+  --dimmer:#5a6b83;
+}
 
-    .slide {
-      display: none;
-      opacity: 0;
-      transition: opacity 0.4s ease-in-out;
-    }
+*{box-sizing:border-box;margin:0;padding:0}
 
-    .slide.active {
-      display: flex;
-      opacity: 1;
-    }
-  </style>
+html,body{
+  height:100%;
+  background:#02040a;
+  color:var(--txt);
+  font-family:"Segoe UI","Helvetica Neue",system-ui,-apple-system,sans-serif;
+  overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+
+.lbl{font-size:11px;font-weight:800;letter-spacing:.22em;text-transform:uppercase;color:var(--dimmer)}
+.lbl-teal{color:var(--teal)}
+.mono{font-family:"Cascadia Mono",Consolas,"SF Mono",monospace;font-variant-numeric:tabular-nums}
+
+/* ---------- 16:9 stage. Fixed canvas, scaled to fit any projector. ---------- */
+#stage{position:fixed;inset:0;display:grid;place-items:center}
+#canvas{
+  width:1600px;height:900px;position:relative;transform-origin:center center;
+  background:
+    radial-gradient(1200px 700px at 78% -12%, rgba(0,242,255,.10), transparent 60%),
+    radial-gradient(900px 600px at 10% 110%, rgba(0,90,180,.14), transparent 60%),
+    var(--ink);
+  border-radius:6px;overflow:hidden;
+}
+#canvas::before{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background-image:
+    linear-gradient(rgba(255,255,255,.022) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.022) 1px,transparent 1px);
+  background-size:56px 56px;
+}
+
+/* Vertically centred. Top-aligned left every slide sitting high with a band of
+   dead space beneath it — fine in a browser, conspicuous at three metres on a
+   boardroom screen. */
+.slide{position:absolute;inset:0;padding:76px 92px 92px;display:none;
+  flex-direction:column;justify-content:center}
+.slide.on{display:flex;animation:rise .5s cubic-bezier(.2,.7,.3,1) both}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+.slide.on > *{animation:fade .45s ease both}
+.slide.on > *:nth-child(1){animation-delay:.05s}
+.slide.on > *:nth-child(2){animation-delay:.12s}
+.slide.on > *:nth-child(3){animation-delay:.19s}
+.slide.on > *:nth-child(4){animation-delay:.26s}
+.slide.on > *:nth-child(5){animation-delay:.33s}
+.slide.on > *:nth-child(6){animation-delay:.40s}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+
+h1{font-size:78px;font-weight:800;letter-spacing:-.02em;line-height:1.02}
+h2{font-size:46px;font-weight:800;letter-spacing:-.015em;line-height:1.1;margin-bottom:10px}
+h3{font-size:19px;font-weight:700}
+.sub{font-size:19px;color:var(--dim);line-height:1.65;max-width:1050px}
+.eyebrow{display:flex;align-items:center;gap:12px;margin-bottom:26px}
+.eyebrow .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);box-shadow:0 0 12px var(--teal)}
+
+.topbar,.footbar{position:absolute;left:0;right:0;display:flex;align-items:center;
+  justify-content:space-between;padding:0 92px;pointer-events:none;z-index:5}
+.topbar{top:0;height:60px}
+.footbar{bottom:0;height:66px}
+.brand{display:flex;align-items:center;gap:11px}
+.brand span{font-size:11px;font-weight:800;letter-spacing:.26em;color:var(--dim)}
+.wqaya{font-size:26px;font-weight:700;color:var(--teal);opacity:.55}
+
+.progress{position:absolute;top:0;left:0;height:2px;background:var(--teal);
+  box-shadow:0 0 10px var(--teal);transition:width .45s cubic-bezier(.2,.7,.3,1);z-index:9}
+
+.panel{background:rgba(255,255,255,.022);border:1px solid var(--line);
+  border-radius:20px;padding:26px 28px}
+.panel.accent{border-color:rgba(0,242,255,.22);background:rgba(0,242,255,.035)}
+.panel.crit{border-color:rgba(255,49,49,.3);background:rgba(255,49,49,.06)}
+
+.grid{display:grid;gap:20px}
+.g2{grid-template-columns:repeat(2,1fr)}
+.g3{grid-template-columns:repeat(3,1fr)}
+.g4{grid-template-columns:repeat(4,1fr)}
+
+.stat{font-size:52px;font-weight:800;letter-spacing:-.03em;line-height:1}
+.stat.sm{font-size:38px}
+.stat.teal{color:var(--teal)}
+.stat.crit{color:var(--critical)}
+.stat.warn{color:var(--warn)}
+.stat.good{color:var(--good)}
+.stat-note{font-size:13px;color:var(--dim);margin-top:9px;line-height:1.5}
+
+ul.clean{list-style:none;display:flex;flex-direction:column;gap:13px}
+ul.clean li{display:flex;gap:13px;font-size:16px;color:var(--dim);line-height:1.55}
+ul.clean li b{color:var(--txt);font-weight:700}
+ul.clean .mk{color:var(--teal);flex-shrink:0;font-weight:800}
+
+.hero{display:flex;flex-direction:column;justify-content:center;height:100%}
+.radar-badge{position:absolute;right:110px;top:50%;transform:translateY(-50%)}
+@keyframes sweep{to{transform:rotate(360deg)}}
+
+.flow{display:flex;align-items:stretch;margin-top:8px}
+.step{flex:1;position:relative;padding:24px 20px;border:1px solid var(--line);
+  background:rgba(255,255,255,.02);border-radius:18px;margin-right:30px}
+.step:last-child{margin-right:0}
+.step::after{content:"";position:absolute;right:-25px;top:50%;width:20px;height:1px;
+  background:linear-gradient(90deg,var(--teal),transparent)}
+.step:last-child::after{display:none}
+.step .n{font-size:10px;font-weight:800;letter-spacing:.18em;color:var(--teal);margin-bottom:12px}
+.step h3{margin-bottom:8px;font-size:16px}
+.step p{font-size:12.5px;color:var(--dim);line-height:1.55}
+.step.auto{border-color:rgba(0,242,255,.28);background:rgba(0,242,255,.05)}
+
+table{width:100%;border-collapse:collapse}
+th{text-align:left;font-size:10px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--dimmer);padding:0 14px 13px;border-bottom:1px solid var(--line)}
+td{padding:12px 14px;font-size:14.5px;border-bottom:1px solid rgba(255,255,255,.045);color:var(--dim)}
+tr:last-child td{border-bottom:none}
+td.k{color:var(--txt);font-weight:600}
+td.num{text-align:right;font-variant-numeric:tabular-nums;color:var(--txt);font-weight:700}
+
+.pill{display:inline-block;padding:4px 11px;border-radius:7px;font-size:10px;
+  font-weight:800;letter-spacing:.13em;text-transform:uppercase}
+.pill.t{background:rgba(0,242,255,.14);color:var(--teal);border:1px solid rgba(0,242,255,.3)}
+.pill.c{background:rgba(255,49,49,.14);color:var(--critical);border:1px solid rgba(255,49,49,.32)}
+.pill.w{background:rgba(255,176,32,.14);color:var(--warn);border:1px solid rgba(255,176,32,.32)}
+.pill.g{background:rgba(61,220,151,.13);color:var(--good);border:1px solid rgba(61,220,151,.3)}
+.pill.n{background:rgba(255,255,255,.06);color:var(--dim);border:1px solid var(--line)}
+
+.bar{height:8px;border-radius:6px;background:rgba(255,255,255,.06);overflow:hidden}
+.bar > i{display:block;height:100%;border-radius:6px}
+
+#nav{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);display:flex;
+  align-items:center;gap:14px;z-index:50;background:rgba(6,10,20,.9);
+  border:1px solid var(--line);padding:9px 16px;border-radius:14px;
+  opacity:.12;transition:opacity .3s}
+#nav:hover{opacity:1}
+#nav button{background:rgba(255,255,255,.05);border:1px solid var(--line);color:var(--txt);
+  height:28px;min-width:32px;border-radius:8px;cursor:pointer;font-size:13px}
+#nav button:hover{background:rgba(0,242,255,.15);border-color:rgba(0,242,255,.4)}
+#counter{font-size:11px;font-weight:800;letter-spacing:.16em;color:var(--dim);min-width:74px;text-align:center}
+/* Bottom-left, and it retires after eight seconds. It sat bottom-right over
+   the وقاية mark, and a presenter should not have the controls competing with
+   the Authority's own identity on the opening frame. */
+#hint{position:fixed;bottom:26px;left:26px;font-size:10px;letter-spacing:.16em;
+  color:var(--dimmer);text-transform:uppercase;font-weight:700;z-index:50;
+  animation:retire .8s ease 8s forwards}
+@keyframes retire{to{opacity:0;visibility:hidden}}
+
+.footnote{font-size:12px;color:var(--dimmer);line-height:1.6;margin-top:auto;padding-top:18px}
+</style>
 </head>
-<body class="h-screen w-screen flex flex-col justify-between p-3 md:p-5 select-none bg-[#050811]">
+<body>
 
-  <!-- Top Header Navigation & Logos Bar -->
-  <header class="flex justify-between items-center z-50 px-4 w-full shrink-0 mb-2">
-    <!-- Official Logos: PHA English Logo + GHI Emblem -->
-    <div class="flex items-center gap-6">
-      
-      <!-- PHA English Logo (Screenshot 1: PUBLIC HEALTH AUTHORITY - English Only) -->
-      <div class="flex flex-col">
-        <span class="text-sm md:text-base font-black tracking-[0.2em] text-[#00A896] uppercase leading-none">PUBLIC HEALTH AUTHORITY</span>
-      </div>
+<div id="stage">
+<div id="canvas">
+  <div class="progress" id="prog"></div>
 
-      <div class="h-6 w-[1px] bg-white/20"></div>
+  <div class="topbar">
+    <div class="brand">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="9.5" stroke="#00F2FF" stroke-width="1.2" opacity=".55"/>
+        <circle cx="12" cy="12" r="5" stroke="#00F2FF" stroke-width="1.2" opacity=".8"/>
+        <circle cx="12" cy="12" r="1.8" fill="#00F2FF"/>
+      </svg>
+      <span>GLOBAL HEALTH INTELLIGENCE</span>
+    </div>
+    <span class="lbl" id="chapter">PUBLIC HEALTH AUTHORITY</span>
+  </div>
 
-      <!-- GHI Emblem (Screenshot 2: Orbital Globe Radar + GLOBAL HEALTH INTELLIGENCE) -->
-      <div class="flex items-center gap-3">
-        <div class="relative w-9 h-9 flex items-center justify-center">
-          <svg class="w-9 h-9 text-ghi-teal" viewBox="0 0 100 100" fill="none" stroke="currentColor">
-            <circle cx="50" cy="50" r="42" stroke-width="3" opacity="0.4" stroke-dasharray="6 4" />
-            <ellipse cx="50" cy="50" rx="42" ry="18" stroke-width="4" />
-            <ellipse cx="50" cy="50" rx="18" ry="42" stroke-width="4" />
-            <circle cx="50" cy="50" r="8" fill="#00F2FF" />
-          </svg>
-        </div>
-        <div class="flex flex-col">
-          <span class="text-xs md:text-sm font-black tracking-widest text-ghi-teal uppercase leading-none">GLOBAL HEALTH</span>
-          <span class="text-[10px] md:text-xs font-bold tracking-[0.25em] text-slate-400 uppercase leading-tight">INTELLIGENCE</span>
-        </div>
+  <div class="footbar">
+    <span class="lbl">PUBLIC HEALTH AUTHORITY · GLOBAL HEALTH DEPARTMENT</span>
+    <span class="wqaya">وقــايــة</span>
+  </div>
+
+  <!-- 1 · TITLE -->
+  <section class="slide on">
+    <div class="hero">
+      <div class="eyebrow"><span class="dot"></span><span class="lbl lbl-teal">Executive Briefing · 2026</span></div>
+      <h1>Global Health<br>Intelligence</h1>
+      <div style="height:26px"></div>
+      <p class="sub" style="max-width:760px;font-size:21px">
+        An event-based surveillance platform that watches the world for disease events, judges them
+        against international law, and puts the ones that matter in front of a Saudi analyst — in
+        hours, not weeks.
+      </p>
+      <div style="height:44px"></div>
+      <div style="display:flex;gap:52px">
+        <div><div class="stat teal">59</div><div class="stat-note">sources monitored</div></div>
+        <div><div class="stat">117</div><div class="stat-note">countries covered</div></div>
+        <div><div class="stat">24/7</div><div class="stat-note">automated collection</div></div>
+        <div><div class="stat good">~350</div><div class="stat-note">SAR per month, all-in</div></div>
       </div>
     </div>
 
-    <!-- Slide Navigation & Fullscreen Controls -->
-    <div class="flex items-center gap-3">
-      <div class="flex items-center gap-2 bg-slate-900/90 border border-white/15 px-4 py-2 rounded-xl text-xs md:text-sm font-bold text-slate-300">
-        <span>Slide <strong id="slide-num" class="text-ghi-teal font-black text-base">1</strong> of <span id="slide-total" class="font-bold">8</span></span>
-      </div>
-
-      <button id="prev-btn" onclick="prevSlide()" class="p-2.5 md:p-3 rounded-xl bg-white/5 hover:bg-ghi-teal/20 hover:text-ghi-teal border border-white/15 transition-all cursor-pointer">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-      </button>
-      
-      <button id="next-btn" onclick="nextSlide()" class="p-2.5 md:p-3 rounded-xl bg-ghi-teal text-slate-950 font-black hover:bg-[#33f5ff] transition-all shadow-[0_0_20px_rgba(0,242,255,0.4)] cursor-pointer">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-      </button>
-
-      <button onclick="toggleFullscreen()" class="p-2.5 md:p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/15 text-slate-300 hover:text-white transition-all cursor-pointer" title="Toggle Fullscreen">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
-      </button>
+    <div class="radar-badge">
+      <svg width="300" height="300" viewBox="0 0 300 300">
+        <defs>
+          <linearGradient id="sw" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#00F2FF" stop-opacity=".55"/>
+            <stop offset="100%" stop-color="#00F2FF" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <circle cx="150" cy="150" r="140" fill="none" stroke="#00F2FF" stroke-opacity=".1"/>
+        <circle cx="150" cy="150" r="104" fill="none" stroke="#00F2FF" stroke-opacity=".13"/>
+        <circle cx="150" cy="150" r="68"  fill="none" stroke="#00F2FF" stroke-opacity=".16"/>
+        <circle cx="150" cy="150" r="32"  fill="none" stroke="#00F2FF" stroke-opacity=".2"/>
+        <line x1="10" y1="150" x2="290" y2="150" stroke="#00F2FF" stroke-opacity=".08"/>
+        <line x1="150" y1="10" x2="150" y2="290" stroke="#00F2FF" stroke-opacity=".08"/>
+        <path d="M150 150 L290 150 A140 140 0 0 0 150 10 Z" fill="url(#sw)"
+              style="transform-origin:150px 150px;animation:sweep 5s linear infinite"/>
+        <circle cx="150" cy="150" r="18" fill="none" stroke="#00F2FF" stroke-width="1.5">
+          <animate attributeName="r" values="18;150" dur="5s" repeatCount="indefinite"/>
+          <animate attributeName="opacity" values=".5;0" dur="5s" repeatCount="indefinite"/>
+        </circle>
+        <circle cx="212" cy="96"  r="4" fill="#FF3131"/>
+        <circle cx="118" cy="196" r="3.4" fill="#FFB020"/>
+        <circle cx="196" cy="212" r="3" fill="#00F2FF"/>
+        <circle cx="150" cy="150" r="3.4" fill="#00F2FF"/>
+      </svg>
     </div>
-  </header>
+  </section>
 
-  <!-- MAIN FULL-VIEWPORT STAGE (Fills 96vw x 90vh, Zero Dead Space) -->
-  <main id="presentation-stage" class="w-full h-[calc(100vh-100px)] relative rounded-3xl overflow-hidden glass-card neon-border flex flex-col justify-between p-6 md:p-10 shadow-2xl">
-    
-    <!-- Background Texture -->
-    <div class="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:28px_28px] opacity-25 pointer-events-none"></div>
-
-    <!-- SLIDE 1: COMPREHENSIVE INTRODUCTION TO GHI -->
-    <div class="slide active flex-col justify-between h-full relative z-10">
-      <div class="flex justify-between items-start border-b border-white/10 pb-4">
-        <div>
-          <span class="text-xs md:text-sm font-black uppercase text-ghi-teal tracking-widest">System Overview</span>
-          <h2 class="text-3xl md:text-5xl font-black text-white uppercase tracking-tight mt-1">
-            Global Health Intelligence <span class="text-ghi-teal neon-text">(GHI) System</span>
-          </h2>
-        </div>
-        <span class="px-4 py-1.5 rounded-full text-xs font-black uppercase bg-ghi-teal/20 text-ghi-teal border border-ghi-teal/40">
-          Public Health Authority
-        </span>
+  <!-- 2 · THE PROBLEM -->
+  <section class="slide">
+    <div class="eyebrow"><span class="dot"></span><span class="lbl lbl-teal">The problem</span></div>
+    <h2>Outbreaks are reported before they are confirmed</h2>
+    <p class="sub">The first signal of an emerging event is almost never a laboratory result. It is a
+    news report, a ministry statement, or a physician noticing something unusual — arriving scattered
+    across dozens of agencies, in several languages, at all hours.</p>
+    <div style="height:34px"></div>
+    <div class="grid g3">
+      <div class="panel">
+        <div class="lbl" style="margin-bottom:14px">Before</div>
+        <h3 style="margin-bottom:12px">Manual scanning</h3>
+        <p style="font-size:14px;color:var(--dim);line-height:1.65">An analyst opens the same thirty
+        websites each morning. Coverage depends on who is on shift, how much time they have, and
+        which languages they read.</p>
       </div>
-
-      <div class="grid grid-cols-1 md:grid-cols-12 gap-6 my-auto items-center">
-        <div class="md:col-span-7 space-y-4">
-          <p class="text-base md:text-xl text-slate-200 font-semibold leading-relaxed">
-            The <strong class="text-white">Global Health Intelligence (GHI) System</strong> is an advanced, automated event-based epidemiological surveillance platform engineered for the <strong class="text-ghi-teal">Public Health Authority (وقاية)</strong>.
-          </p>
-          <p class="text-sm md:text-base text-slate-400 leading-relaxed font-medium">
-            It aggregates, parses, triages, and evaluates global health signals across 45 primary surveillance networks to detect infectious disease outbreaks, CBRN incidents, and environmental health threats in real time.
-          </p>
-
-          <!-- Core Architecture Pipeline Graph -->
-          <div class="p-4 rounded-2xl bg-slate-950/80 border border-white/10 space-y-2">
-            <span class="text-xs font-black text-ghi-teal uppercase tracking-widest block">Automated End-to-End Pipeline</span>
-            <div class="grid grid-cols-4 gap-2 text-center text-xs font-bold">
-              <div class="p-2.5 rounded-xl bg-ghi-teal/15 text-ghi-teal border border-ghi-teal/30">1. 45 Feeds Scraped</div>
-              <div class="p-2.5 rounded-xl bg-ghi-teal/15 text-ghi-teal border border-ghi-teal/30">2. Dual Triage</div>
-              <div class="p-2.5 rounded-xl bg-ghi-teal/15 text-ghi-teal border border-ghi-teal/30">3. IHR/RRA Risk</div>
-              <div class="p-2.5 rounded-xl bg-ghi-success/20 text-ghi-success border border-ghi-success/40">4. Executive Action</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="md:col-span-5 grid grid-cols-2 gap-4 text-left">
-          <div class="p-5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-1">
-            <span class="text-3xl md:text-4xl font-black text-ghi-teal">45</span>
-            <span class="text-xs text-slate-400 font-bold uppercase block">Ingestion Sources</span>
-            <p class="text-[11px] text-slate-500">WHO, CDC, ProMED, ECDC, Beacon Bio</p>
-          </div>
-          <div class="p-5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-1">
-            <span class="text-3xl md:text-4xl font-black text-ghi-success">24h</span>
-            <span class="text-xs text-slate-400 font-bold uppercase block">Verification SLA</span>
-            <p class="text-[11px] text-slate-500">Mandatory verification countdown</p>
-          </div>
-          <div class="p-5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-1">
-            <span class="text-3xl md:text-4xl font-black text-ghi-warning">100%</span>
-            <span class="text-xs text-slate-400 font-bold uppercase block">Vector Command Map</span>
-            <p class="text-[11px] text-slate-500">React-Simple-Maps GeoMercator</p>
-          </div>
-          <div class="p-5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-1">
-            <span class="text-3xl md:text-4xl font-black text-white">WHO</span>
-            <span class="text-xs text-slate-400 font-bold uppercase block">IHR & RRA Standard</span>
-            <p class="text-[11px] text-slate-500">Evidence-based risk matrix</p>
-          </div>
-        </div>
+      <div class="panel">
+        <div class="lbl" style="margin-bottom:14px">The gap</div>
+        <h3 style="margin-bottom:12px">Volume beats attention</h3>
+        <p style="font-size:14px;color:var(--dim);line-height:1.65">There is no shortage of health
+        news. There is a shortage of judgement about which item, out of hundreds, will matter to the
+        Kingdom next month.</p>
       </div>
-
-      <div class="flex justify-between items-center text-xs text-slate-400 pt-4 border-t border-white/10">
-        <span>Maintained by: Global Health Intelligence Development Team</span>
-        <span class="text-[#00A896] font-bold uppercase">PUBLIC HEALTH AUTHORITY</span>
+      <div class="panel accent">
+        <div class="lbl lbl-teal" style="margin-bottom:14px">What GHI does</div>
+        <h3 style="margin-bottom:12px">Collect, score, escalate</h3>
+        <p style="font-size:14px;color:var(--dim);line-height:1.65">Machines do the reading and the
+        arithmetic. People do the judgement. Everything the system decides is recorded with the
+        reasoning that produced it.</p>
       </div>
     </div>
+    <p class="footnote">This is the model WHO calls <b style="color:var(--txt)">Event-Based
+    Surveillance</b> — the same approach behind WHO's own EIOS platform. GHI applies it with Saudi
+    priorities built into the scoring.</p>
+  </section>
 
-    <!-- SLIDE 2: GLOBAL RADAR & 45-SOURCE INGESTION ENGINE -->
-    <div class="slide flex-col justify-between h-full relative z-10">
-      <div class="flex justify-between items-start border-b border-white/10 pb-4">
-        <div>
-          <span class="text-xs md:text-sm font-black uppercase text-ghi-teal tracking-widest">Multi-Source Ingestion</span>
-          <h2 class="text-3xl md:text-5xl font-black text-white uppercase tracking-tight mt-1">
-            Global Radar & 45-Source Engine
-          </h2>
-        </div>
-        <span class="px-4 py-1.5 rounded-full text-xs font-black uppercase bg-white/5 text-slate-300 border border-white/10">02 // 08</span>
-      </div>
+  <!-- 3 · WORKFLOW -->
+  <section class="slide">
+    <div class="eyebrow"><span class="dot"></span><span class="lbl lbl-teal">How it works</span></div>
+    <h2>Two streams in, one decision out</h2>
+    <p class="sub">Every item follows the same path and no step is skipped. Verification comes before
+    risk assessment, exactly as WHO's event-based surveillance requires — a rumour cannot escalate itself.</p>
+    <div style="height:30px"></div>
 
-      <div class="grid grid-cols-1 md:grid-cols-12 gap-6 my-auto items-center">
-        <!-- Left Side: Source Description & Capabilities -->
-        <div class="md:col-span-6 space-y-4">
-          <div class="p-5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-2">
-            <span class="px-2.5 py-1 rounded text-xs font-black uppercase bg-ghi-teal/20 text-ghi-teal border border-ghi-teal/30">Background Automation</span>
-            <h3 class="text-lg font-black text-white uppercase">Serverless Collector Microservices</h3>
-            <p class="text-sm text-slate-300 leading-relaxed font-medium">
-              Runs native Cloudflare Worker background workers polling 45 surveillance sources every 2 hours without manual intervention.
-            </p>
-          </div>
-
-          <div class="p-5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-2">
-            <span class="px-2.5 py-1 rounded text-xs font-black uppercase bg-ghi-success/20 text-ghi-success border border-ghi-success/30">Retrospective Cutoff</span>
-            <h3 class="text-lg font-black text-white uppercase">July 25th, 2026 Baseline Boundary</h3>
-            <p class="text-sm text-slate-300 leading-relaxed font-medium">
-              Enforces a retrospective date cutoff (July 25, 2026) ensuring all historical outbreak backfills and incoming signals post-July 25th are detected and parsed.
-            </p>
-          </div>
-        </div>
-
-        <!-- Right Side: Live Source Monitor & Frequency Graph Visual -->
-        <div class="md:col-span-6 p-6 rounded-3xl bg-slate-950/90 border border-ghi-teal/40 space-y-4 shadow-2xl">
-          <div class="flex justify-between items-center">
-            <h3 class="text-sm font-black text-white uppercase tracking-wider">45 Source Health Status Monitor</h3>
-            <span class="text-xs text-ghi-success font-black uppercase flex items-center gap-1.5">
-              <span class="w-2 h-2 rounded-full bg-ghi-success animate-ping"></span> All Feeds Active
-            </span>
-          </div>
-
-          <!-- Source Status Grid preview -->
-          <div class="grid grid-cols-2 gap-2 text-xs">
-            <div class="p-2.5 rounded-xl bg-white/[0.03] border border-white/10 flex justify-between items-center">
-              <div><strong class="text-white block">Beacon Bio</strong><span class="text-[10px] text-slate-400">Direct API</span></div>
-              <span class="w-2.5 h-2.5 rounded-full bg-ghi-success shadow-[0_0_8px_#39FF14]"></span>
-            </div>
-            <div class="p-2.5 rounded-xl bg-white/[0.03] border border-white/10 flex justify-between items-center">
-              <div><strong class="text-white block">WHO DONs</strong><span class="text-[10px] text-slate-400">Official Outbreaks</span></div>
-              <span class="w-2.5 h-2.5 rounded-full bg-ghi-success shadow-[0_0_8px_#39FF14]"></span>
-            </div>
-            <div class="p-2.5 rounded-xl bg-white/[0.03] border border-white/10 flex justify-between items-center">
-              <div><strong class="text-white block">CDC Outbreaks</strong><span class="text-[10px] text-slate-400">US CDC Feed</span></div>
-              <span class="w-2.5 h-2.5 rounded-full bg-ghi-success shadow-[0_0_8px_#39FF14]"></span>
-            </div>
-            <div class="p-2.5 rounded-xl bg-white/[0.03] border border-white/10 flex justify-between items-center">
-              <div><strong class="text-white block">ProMED-mail</strong><span class="text-[10px] text-slate-400">Emerging Diseases</span></div>
-              <span class="w-2.5 h-2.5 rounded-full bg-ghi-success shadow-[0_0_8px_#39FF14]"></span>
-            </div>
-            <div class="p-2.5 rounded-xl bg-white/[0.03] border border-white/10 flex justify-between items-center">
-              <div><strong class="text-white block">WHO Mpox API</strong><span class="text-[10px] text-slate-400">Validated Daily</span></div>
-              <span class="w-2.5 h-2.5 rounded-full bg-ghi-success shadow-[0_0_8px_#39FF14]"></span>
-            </div>
-            <div class="p-2.5 rounded-xl bg-white/[0.03] border border-white/10 flex justify-between items-center">
-              <div><strong class="text-white block">GTFCC Cholera</strong><span class="text-[10px] text-slate-400">Global Trends</span></div>
-              <span class="w-2.5 h-2.5 rounded-full bg-ghi-success shadow-[0_0_8px_#39FF14]"></span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="flex justify-between items-center text-xs text-slate-400 pt-4 border-t border-white/10">
-        <span>Continuous 24/7 scanning across biological, environmental, and CBRN networks</span>
-        <span class="text-ghi-teal font-bold uppercase">Public Health Authority</span>
-      </div>
+    <div class="flow">
+      <div class="step"><div class="n">01 · COLLECT</div><h3>Global Radar</h3>
+        <p>59 official sources checked automatically. A page is only re-read when its content actually changes.</p></div>
+      <div class="step"><div class="n">02 · COLLECT</div><h3>Social Listener</h3>
+        <p>12 accounts on X — ministries, WHO, ProMED, regional experts — matched against 64 watch terms.</p></div>
+      <div class="step auto"><div class="n">03 · SCORE</div><h3>IHR Scoring</h3>
+        <p>Scored against the four IHR Annex 2 questions. Anything clearing the threshold reaches an analyst.</p></div>
+      <div class="step"><div class="n">04 · DECIDE</div><h3>Triage</h3>
+        <p>An analyst accepts or rejects. Acceptance opens an assessment; rejection is recorded with a reason.</p></div>
+      <div class="step auto"><div class="n">05 · ASSESS</div><h3>Assessment</h3>
+        <p>IHR Annex 2 and a Rapid Risk Assessment, pre-drafted by the system, edited by the analyst.</p></div>
+      <div class="step"><div class="n">06 · ACT</div><h3>Escalation</h3>
+        <p>Director review with the full reasoning attached — which questions were answered yes, and why.</p></div>
     </div>
 
-    <!-- SLIDE 3: INTERACTIVE WORLD VECTOR COMMAND MAP -->
-    <div class="slide flex-col justify-between h-full relative z-10">
-      <div class="flex justify-between items-start border-b border-white/10 pb-4">
-        <div>
-          <span class="text-xs md:text-sm font-black uppercase text-ghi-teal tracking-widest">Geospatial Intelligence</span>
-          <h2 class="text-3xl md:text-5xl font-black text-white uppercase tracking-tight mt-1">
-            Map-First Geospatial Command Center
-          </h2>
-        </div>
-        <span class="px-4 py-1.5 rounded-full text-xs font-black uppercase bg-white/5 text-slate-300 border border-white/10">03 // 08</span>
-      </div>
+    <div style="height:28px"></div>
+    <div class="panel accent" style="display:flex;align-items:center;gap:22px">
+      <span class="pill t" style="flex-shrink:0">Automated</span>
+      <p style="font-size:15px;color:var(--dim);line-height:1.6">Steps 3 and 5 run without a person.
+      <b style="color:var(--txt)">Every automated output is a draft.</b> The analyst's answer is
+      stored separately and always takes precedence — the machine's original position stays on the
+      record, so any disagreement is visible and auditable.</p>
+    </div>
+  </section>
 
-      <div class="grid grid-cols-1 md:grid-cols-12 gap-6 my-auto items-center">
-        <!-- Interactive Vector Map Mockup Screen -->
-        <div class="md:col-span-8 p-4 rounded-3xl bg-slate-950/90 border border-ghi-teal/50 shadow-2xl relative overflow-hidden h-72 flex flex-col justify-between">
-          <div class="flex justify-between items-center z-10">
-            <span class="px-3 py-1 rounded-xl text-xs font-black bg-slate-900/90 border border-white/10 text-white">
-              Global Outbreak Threat Map (React-Simple-Maps)
-            </span>
-            <div class="flex items-center gap-1.5 bg-slate-900/90 p-1 rounded-xl border border-white/10 text-[10px] font-bold">
-              <span class="px-2 py-0.5 rounded bg-ghi-teal text-slate-950 font-black">All (45)</span>
-              <span class="px-2 py-0.5 text-slate-400">Biological</span>
-              <span class="px-2 py-0.5 text-slate-400">CBRN</span>
-            </div>
-          </div>
+  <!-- 4 · THE METHOD -->
+  <section class="slide">
+    <div class="eyebrow"><span class="dot"></span><span class="lbl lbl-teal">The method</span></div>
+    <h2>Scored against international law, not intuition</h2>
+    <p class="sub">Priority is not a feeling. Every signal is scored on the four questions the
+    International Health Regulations (2005) Annex 2 requires a State Party to ask.</p>
+    <div style="height:28px"></div>
 
-          <!-- SVG World Vector Map Graphic Preview -->
-          <div class="absolute inset-0 flex items-center justify-center opacity-70">
-            <svg class="w-full h-full text-slate-800" viewBox="0 0 1000 500" fill="none" stroke="currentColor">
-              <path d="M150,120 Q200,80 300,140 T500,100 T700,160 T900,120 L950,300 L800,450 L600,400 L400,420 L200,380 Z" fill="#0f172a" stroke="#1e293b" stroke-width="2" />
-              <!-- Outbreak Radar Nodes -->
-              <g transform="translate(520, 220)">
-                <circle r="16" fill="#FF3131" opacity="0.3" class="animate-ping" />
-                <circle r="8" fill="#FF3131" stroke="#ffffff" stroke-width="2" />
-              </g>
-              <g transform="translate(610, 180)">
-                <circle r="12" fill="#00F2FF" opacity="0.4" class="animate-ping" />
-                <circle r="6" fill="#00F2FF" stroke="#ffffff" stroke-width="2" />
-              </g>
-              <g transform="translate(560, 260)">
-                <circle r="10" fill="#F4B400" opacity="0.4" class="animate-ping" />
-                <circle r="5" fill="#F4B400" stroke="#ffffff" stroke-width="2" />
-              </g>
-            </svg>
-          </div>
-
-          <div class="flex justify-between items-center z-10 text-[11px] font-bold text-slate-400">
-            <span>Center: Saudi Arabia & Middle East [35, 20]</span>
-            <div class="flex items-center gap-3">
-              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-ghi-critical"></span> Critical</span>
-              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-ghi-teal"></span> High</span>
-              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-ghi-warning"></span> CBRN</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Map Feature Highlights -->
-        <div class="md:col-span-4 space-y-3 text-xs">
-          <div class="p-4 rounded-2xl bg-white/[0.03] border border-white/10">
-            <h4 class="font-black text-white uppercase text-sm mb-1">100% Vector Map Canvas</h4>
-            <p class="text-slate-300">Renders actual landmass polygons for all continents using <code>countries-110m.json</code>.</p>
-          </div>
-          <div class="p-4 rounded-2xl bg-white/[0.03] border border-white/10">
-            <h4 class="font-black text-white uppercase text-sm mb-1">Interactive Navigation</h4>
-            <p class="text-slate-300">Supports geographic zoom in, zoom out, drag-to-pan, and reset projection.</p>
-          </div>
-          <div class="p-4 rounded-2xl bg-white/[0.03] border border-white/10">
-            <h4 class="font-black text-white uppercase text-sm mb-1">Precise Coordinate Placement</h4>
-            <p class="text-slate-300">Positions outbreak events at exact latitude/longitude with animated severity rings.</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="flex justify-between items-center text-xs text-slate-400 pt-4 border-t border-white/10">
-        <span>Map-first command layout designed for immediate high-density spatial visualization</span>
-        <span class="text-ghi-teal font-bold uppercase">Public Health Authority</span>
-      </div>
+    <div class="grid g4">
+      <div class="panel"><div class="lbl lbl-teal" style="margin-bottom:12px">Question 1</div>
+        <h3 style="margin-bottom:10px">Serious impact?</h3>
+        <p style="font-size:13px;color:var(--dim);line-height:1.6">Judged against the expected level for
+        that disease in that country — not against raw case counts.</p></div>
+      <div class="panel"><div class="lbl lbl-teal" style="margin-bottom:12px">Question 2</div>
+        <h3 style="margin-bottom:10px">Unusual or unexpected?</h3>
+        <p style="font-size:13px;color:var(--dim);line-height:1.6">Novelty is the strongest single
+        predictor of a public health emergency of international concern.</p></div>
+      <div class="panel"><div class="lbl lbl-teal" style="margin-bottom:12px">Question 3</div>
+        <h3 style="margin-bottom:10px">Risk of spread?</h3>
+        <p style="font-size:13px;color:var(--dim);line-height:1.6">Healthcare-worker infection weighs
+        heavily — the classic sentinel for sustained human transmission.</p></div>
+      <div class="panel"><div class="lbl lbl-teal" style="margin-bottom:12px">Question 4</div>
+        <h3 style="margin-bottom:10px">Travel or trade risk?</h3>
+        <p style="font-size:13px;color:var(--dim);line-height:1.6">Border measures and advisories carry
+        direct economic consequence for the Kingdom.</p></div>
     </div>
 
-    <!-- SLIDE 4: OVERMAP COLLAPSIBLE CONTROL PANELS -->
-    <div class="slide flex-col justify-between h-full relative z-10">
-      <div class="flex justify-between items-start border-b border-white/10 pb-4">
-        <div>
-          <span class="text-xs md:text-sm font-black uppercase text-ghi-teal tracking-widest">UX Control Architecture</span>
-          <h2 class="text-3xl md:text-5xl font-black text-white uppercase tracking-tight mt-1">
-            Overmap Collapsible Control Drawers
-          </h2>
-        </div>
-        <span class="px-4 py-1.5 rounded-full text-xs font-black uppercase bg-white/5 text-slate-300 border border-white/10">04 // 08</span>
+    <div style="height:24px"></div>
+    <div class="grid g2">
+      <div class="panel crit">
+        <div class="lbl" style="color:var(--critical);margin-bottom:12px">The escalation rule</div>
+        <p style="font-size:15px;line-height:1.65;color:var(--dim)">
+        <b style="color:var(--txt);font-size:19px">Any two of four means notify WHO.</b><br>
+        That is Annex 2's own threshold, not a number this system invented. A high score is therefore
+        a <i>prediction of the legal outcome</i>, not a separate opinion about it.</p>
       </div>
-
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 my-auto items-center text-xs">
-        <div class="p-6 rounded-2xl bg-white/[0.03] border border-white/10 space-y-3">
-          <span class="px-2.5 py-1 rounded text-xs font-black uppercase bg-ghi-teal/20 text-ghi-teal border border-ghi-teal/30">Drawer 1</span>
-          <h3 class="text-base font-black text-white uppercase">45 Sources Monitor Drawer</h3>
-          <p class="text-slate-300 leading-relaxed font-medium">
-            Floating panel opening over the map on demand. Displays real-time operational status, fetch intervals, and sync health for all 45 feeds.
-          </p>
-        </div>
-
-        <div class="p-6 rounded-2xl bg-white/[0.03] border border-white/10 space-y-3">
-          <span class="px-2.5 py-1 rounded text-xs font-black uppercase bg-ghi-teal/20 text-ghi-teal border border-ghi-teal/30">Drawer 2</span>
-          <h3 class="text-base font-black text-white uppercase">Live Signals Stream Drawer</h3>
-          <p class="text-slate-300 leading-relaxed font-medium">
-            Collapsible stream sidebar listing live detected outbreaks since July 25th with 1-click <strong>Promote to Triage Queue</strong> buttons.
-          </p>
-        </div>
-
-        <div class="p-6 rounded-2xl bg-white/[0.03] border border-white/10 space-y-3">
-          <span class="px-2.5 py-1 rounded text-xs font-black uppercase bg-ghi-teal/20 text-ghi-teal border border-ghi-teal/30">Node Inspector</span>
-          <h3 class="text-base font-black text-white uppercase">Interactive Node Detail Card</h3>
-          <p class="text-slate-300 leading-relaxed font-medium">
-            Clicking any map node opens an event detail card directly over the map with case counts, fatality ratios, summaries, and source URLs.
-          </p>
-        </div>
-      </div>
-
-      <div class="flex justify-between items-center text-xs text-slate-400 pt-4 border-t border-white/10">
-        <span>Drawers float on top of the vector canvas without obscuring the global map view</span>
-        <span class="text-ghi-teal font-bold uppercase">Public Health Authority</span>
+      <div class="panel">
+        <div class="lbl" style="margin-bottom:12px">Anomaly, not magnitude</div>
+        <p style="font-size:15px;line-height:1.65;color:var(--dim)">
+        Forty cholera cases in Yemen during an ongoing epidemic is background.
+        <b style="color:var(--txt)">Four in Riyadh is an emergency.</b><br>
+        45 disease baselines encode what “expected” means per disease and country, so severity is
+        measured as deviation.</p>
       </div>
     </div>
+  </section>
 
-    <!-- SLIDE 5: DUAL-MODE SOP TRIAGE CENTER -->
-    <div class="slide flex-col justify-between h-full relative z-10">
-      <div class="flex justify-between items-start border-b border-white/10 pb-4">
-        <div>
-          <span class="text-xs md:text-sm font-black uppercase text-ghi-teal tracking-widest">Workflow Specialization</span>
-          <h2 class="text-3xl md:text-5xl font-black text-white uppercase tracking-tight mt-1">
-            Dual-Mode SOP Triage Center
-          </h2>
-        </div>
-        <span class="px-4 py-1.5 rounded-full text-xs font-black uppercase bg-white/5 text-slate-300 border border-white/10">05 // 08</span>
+  <!-- 5 · COVERAGE -->
+  <section class="slide">
+    <div class="eyebrow"><span class="dot"></span><span class="lbl lbl-teal">Coverage</span></div>
+    <h2>59 sources, ranked by how much they can be believed</h2>
+    <p class="sub">Not all reporting is equal. Each source carries a credibility score, and confidence
+    rises when independent sources agree — the strongest evidence this kind of surveillance produces.</p>
+    <div style="height:24px"></div>
+
+    <div class="grid g2" style="gap:26px">
+      <div class="panel">
+        <table>
+          <thead><tr><th>Tier</th><th>Examples</th><th style="text-align:right">Score</th></tr></thead>
+          <tbody>
+            <tr><td class="k">Multilateral &amp; national authorities</td><td>WHO, US CDC, ECDC, Africa CDC, PAHO, UKHSA</td><td class="num">100</td></tr>
+            <tr><td class="k">National ministries of health</td><td>Saudi MOH, RKI, Japan MHLW, China CDC</td><td class="num">95</td></tr>
+            <tr><td class="k">Early-warning networks</td><td>ProMED, Global.health</td><td class="num">90</td></tr>
+            <tr><td class="k">News agencies</td><td>Reuters, AP, AFP</td><td class="num">85</td></tr>
+            <tr><td class="k">Humanitarian reporting</td><td>ReliefWeb, OCHA, IFRC</td><td class="num">80</td></tr>
+            <tr><td class="k">Specialist health press</td><td>CIDRAP</td><td class="num">75</td></tr>
+            <tr><td class="k">Preprint servers</td><td>medRxiv, bioRxiv</td><td class="num">65</td></tr>
+            <tr><td class="k">Social media</td><td>X — always requires corroboration</td><td class="num">30</td></tr>
+          </tbody>
+        </table>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 my-auto text-xs">
-        <!-- Visual Card View UI Preview -->
-        <div class="p-6 rounded-3xl bg-slate-950/90 border border-white/15 space-y-4 shadow-xl">
-          <div class="flex justify-between items-center border-b border-white/10 pb-3">
-            <h3 class="text-sm font-black text-white uppercase">1. Visual Card View Mode</h3>
-            <span class="px-2.5 py-1 rounded text-[10px] font-black uppercase bg-ghi-teal/20 text-ghi-teal">Visual Triaging</span>
-          </div>
-
-          <!-- Card View UI Preview Component -->
-          <div class="p-4 rounded-2xl bg-white/[0.03] border border-ghi-teal/40 space-y-2">
-            <div class="flex justify-between items-center text-[10px]">
-              <span class="px-2 py-0.5 rounded bg-ghi-teal/20 text-ghi-teal font-bold">Beacon Bio</span>
-              <span class="px-2 py-0.5 rounded bg-ghi-critical/20 text-ghi-critical font-bold">Score: 92 (Critical)</span>
-            </div>
-            <h4 class="font-bold text-white text-xs">Acute Diarrhea Surge in Coastal Districts</h4>
-            <div class="flex justify-between text-[11px] text-slate-400">
-              <span>Cholera • Yemen</span>
-              <span>420 Cases (2.85% CFR)</span>
-            </div>
-            <div class="flex gap-2 pt-2">
-              <button class="flex-1 py-1.5 rounded-lg bg-ghi-success text-slate-950 font-black text-[10px] uppercase">Accept & Promote</button>
-              <button class="py-1.5 px-3 rounded-lg bg-white/5 text-slate-400 text-[10px] uppercase">Reject</button>
-            </div>
-          </div>
+      <div style="display:flex;flex-direction:column;gap:20px">
+        <div class="panel accent">
+          <div class="lbl lbl-teal" style="margin-bottom:14px">Why preprints sit below Reuters</div>
+          <p style="font-size:15px;color:var(--dim);line-height:1.65">A preprint has not been peer
+          reviewed. Treating it as “scientific, therefore reliable” is how a paper that is later
+          withdrawn becomes a national alert.</p>
         </div>
-
-        <!-- Line-Listing Table View UI Preview -->
-        <div class="p-6 rounded-3xl bg-slate-950/90 border border-white/15 space-y-4 shadow-xl">
-          <div class="flex justify-between items-center border-b border-white/10 pb-3">
-            <h3 class="text-sm font-black text-white uppercase">2. Line-Listing Table Mode</h3>
-            <span class="px-2.5 py-1 rounded text-[10px] font-black uppercase bg-ghi-teal/20 text-ghi-teal">High-Density Batch</span>
-          </div>
-
-          <!-- Table Preview Component -->
-          <div class="space-y-1 text-[11px]">
-            <div class="grid grid-cols-4 p-2 rounded-lg bg-white/5 font-bold text-slate-400 uppercase text-[9px]">
-              <span>Disease</span><span>Country</span><span>Cases</span><span>Action</span>
-            </div>
-            <div class="grid grid-cols-4 p-2 rounded-lg bg-white/[0.02] border border-white/5 text-white">
-              <span>Cholera</span><span>Yemen</span><span>420</span><span class="text-ghi-teal font-bold">Promote</span>
-            </div>
-            <div class="grid grid-cols-4 p-2 rounded-lg bg-white/[0.02] border border-white/5 text-white">
-              <span>Meningitis</span><span>Sudan</span><span>85</span><span class="text-ghi-teal font-bold">Promote</span>
-            </div>
-            <div class="grid grid-cols-4 p-2 rounded-lg bg-white/[0.02] border border-white/5 text-white">
-              <span>H5N1 Avian</span><span>Egypt</span><span>34</span><span class="text-ghi-teal font-bold">Promote</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="p-4 rounded-xl bg-ghi-teal/10 border border-ghi-teal/30 text-xs flex justify-between items-center">
-        <span><strong>24-Hour Verification SLA Engine:</strong> Live countdown timer enforcing the SOP requirement for 24h sector verification.</span>
-        <span class="text-ghi-teal font-bold uppercase">SOP SLA Enforced</span>
-      </div>
-    </div>
-
-    <!-- SLIDE 6: SOCIAL LISTENER ENGINE -->
-    <div class="slide flex-col justify-between h-full relative z-10">
-      <div class="flex justify-between items-start border-b border-white/10 pb-4">
-        <div>
-          <span class="text-xs md:text-sm font-black uppercase text-ghi-teal tracking-widest">Early Media Intelligence</span>
-          <h2 class="text-3xl md:text-5xl font-black text-white uppercase tracking-tight mt-1">
-            Social Listener & Media Surveillance
-          </h2>
-        </div>
-        <span class="px-4 py-1.5 rounded-full text-xs font-black uppercase bg-white/5 text-slate-300 border border-white/10">06 // 08</span>
-      </div>
-
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 my-auto text-xs">
-        <div class="p-6 rounded-2xl bg-white/[0.03] border border-white/10 space-y-3">
-          <span class="px-2.5 py-1 rounded text-xs font-black uppercase bg-ghi-teal/20 text-ghi-teal border border-ghi-teal/30">Keyword Engine</span>
-          <h3 class="text-base font-black text-white uppercase">Automated Keyword Detection</h3>
-          <p class="text-slate-300 leading-relaxed font-medium">
-            Scans X/Twitter and open media feeds for official keywords: <em>Outbreak, Cluster, Spike in cases, Mystery illness, Hospital overload, Fatalities rising</em>.
-          </p>
-        </div>
-
-        <div class="p-6 rounded-2xl bg-white/[0.03] border border-white/10 space-y-3">
-          <span class="px-2.5 py-1 rounded text-xs font-black uppercase bg-ghi-teal/20 text-ghi-teal border border-ghi-teal/30">Monitored Accounts</span>
-          <h3 class="text-base font-black text-white uppercase">Key Account Tracking</h3>
-          <p class="text-slate-300 leading-relaxed font-medium">
-            Monitors health ministry handles, WHO officials, regional health channels, and verified epidemiologists for early signals.
-          </p>
-        </div>
-
-        <div class="p-6 rounded-2xl bg-white/[0.03] border border-white/10 space-y-3">
-          <span class="px-2.5 py-1 rounded text-xs font-black uppercase bg-ghi-teal/20 text-ghi-teal border border-ghi-teal/30">Signal Conversion</span>
-          <h3 class="text-base font-black text-white uppercase">1-Click Post Promotion</h3>
-          <p class="text-slate-300 leading-relaxed font-medium">
-            1-click action turns verified social media posts into formal GHI surveillance signals for risk evaluation.
-          </p>
-        </div>
-      </div>
-
-      <div class="flex justify-between items-center text-xs text-slate-400 pt-4 border-t border-white/10">
-        <span>Provides early warning days before official international agency reports are published</span>
-        <span class="text-ghi-teal font-bold uppercase">Public Health Authority</span>
-      </div>
-    </div>
-
-    <!-- SLIDE 7: STRUCTURED IHR & RRA RISK ASSESSMENT -->
-    <div class="slide flex-col justify-between h-full relative z-10">
-      <div class="flex justify-between items-start border-b border-white/10 pb-4">
-        <div>
-          <span class="text-xs md:text-sm font-black uppercase text-ghi-teal tracking-widest">WHO Analytical Standard</span>
-          <h2 class="text-3xl md:text-5xl font-black text-white uppercase tracking-tight mt-1">
-            Structured IHR & RRA Risk Assessment
-          </h2>
-        </div>
-        <span class="px-4 py-1.5 rounded-full text-xs font-black uppercase bg-white/5 text-slate-300 border border-white/10">07 // 08</span>
-      </div>
-
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 my-auto text-xs">
-        <div class="p-6 rounded-2xl bg-white/[0.03] border border-white/10 space-y-3">
-          <h3 class="font-black text-white uppercase text-base">International Health Regulations (IHR) Matrix</h3>
-          <ul class="space-y-2 text-slate-300 text-sm">
-            <li>• <strong>Question 1:</strong> Is the public health impact serious?</li>
-            <li>• <strong>Question 2:</strong> Is the event unusual or unexpected?</li>
-            <li>• <strong>Question 3:</strong> Is there a significant risk of international spread?</li>
-            <li>• <strong>Question 4:</strong> Is there a significant risk of travel/trade restrictions?</li>
-          </ul>
-        </div>
-
-        <div class="p-6 rounded-2xl bg-white/[0.03] border border-white/10 space-y-3">
-          <h3 class="font-black text-white uppercase text-base">WHO Rapid Risk Assessment (RRA) Engine</h3>
-          <ul class="space-y-2 text-slate-300 text-sm">
-            <li>• <strong>Hazard Assessment:</strong> Pathogenicity, transmissibility & CFR</li>
-            <li>• <strong>Exposure Assessment:</strong> Population contact & vector dynamics</li>
-            <li>• <strong>Context Assessment:</strong> Healthcare system capacity & resources</li>
-            <li>• <strong>Overall Risk Rating:</strong> Low / Moderate / High / Very High</li>
+        <div class="panel">
+          <div class="lbl" style="margin-bottom:14px">Coverage extends beyond human disease</div>
+          <ul class="clean" style="gap:9px">
+            <li><span class="mk">▪</span><span><b>One Health</b> — animal disease sources, because most emerging pathogens are zoonotic</span></li>
+            <li><span class="mk">▪</span><span><b>Environmental &amp; CBRN</b> — chemical and radiological events, not only biological</span></li>
+            <li><span class="mk">▪</span><span><b>GCC &amp; neighbours</b> — weighted for borders, corridors and pilgrim flows</span></li>
+            <li><span class="mk">▪</span><span><b>Arabic-language</b> reporting across the region</span></li>
           </ul>
         </div>
       </div>
+    </div>
+  </section>
 
-      <div class="flex justify-between items-center text-xs text-slate-400 pt-4 border-t border-white/10">
-        <span>Ensures national response decisions align strictly with WHO and IHR guidelines</span>
-        <span class="text-ghi-teal font-bold uppercase">Public Health Authority</span>
+  <!-- 6 · ANALYST EXPERIENCE -->
+  <section class="slide">
+    <div class="eyebrow"><span class="dot"></span><span class="lbl lbl-teal">Analyst experience</span></div>
+    <h2>The assessment is written before the analyst opens it</h2>
+    <p class="sub">Accepting a signal produces a completed IHR Annex 2 answer set and Rapid Risk
+    Assessment, with the reasoning behind each answer. The analyst edits rather than composes.</p>
+    <div style="height:26px"></div>
+
+    <div class="grid g2" style="gap:26px">
+      <div class="panel">
+        <div class="lbl" style="margin-bottom:16px">Example — generated, unedited</div>
+        <div style="display:flex;gap:9px;margin-bottom:14px">
+          <span class="pill c">Critical</span><span class="pill t">Notify WHO</span><span class="pill n">Confidence: High</span>
+        </div>
+        <h3 style="margin-bottom:5px">MERS-CoV — Saudi Arabia</h3>
+        <p style="font-size:12px;color:var(--dimmer);margin-bottom:14px">WHO EMRO · 2 of 4 Annex 2 questions answered yes</p>
+        <table>
+          <tbody>
+            <tr><td class="k" style="width:60%">Q1 · Serious public health impact</td><td style="text-align:right"><span class="pill c">Yes</span></td></tr>
+            <tr><td class="k">Q2 · Unusual or unexpected</td><td style="text-align:right"><span class="pill n">No</span></td></tr>
+            <tr><td class="k">Q3 · Risk of international spread</td><td style="text-align:right"><span class="pill c">Yes</span></td></tr>
+            <tr><td class="k">Q4 · Travel or trade measures</td><td style="text-align:right"><span class="pill n">No</span></td></tr>
+          </tbody>
+        </table>
+        <p style="font-size:12.5px;color:var(--dimmer);line-height:1.6;margin-top:14px;font-style:italic">
+        “Observed CFR 39.0% is at or above the 35% baseline. Respiratory transmission route.
+        MERS-CoV is endemic in Saudi Arabia; occurrence is expected rather than novel.”</p>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:18px">
+        <div class="panel accent">
+          <div class="lbl lbl-teal" style="margin-bottom:12px">The analyst always wins</div>
+          <p style="font-size:14.5px;color:var(--dim);line-height:1.65">The draft is frozen the moment
+          it is written. Analyst edits are stored separately, so the difference between the two
+          <b style="color:var(--txt)">is</b> the override record — no precedence rule, nothing to
+          configure, and the machine's original position remains available for audit.</p>
+        </div>
+        <div class="panel">
+          <div class="lbl" style="margin-bottom:12px">No model decides risk</div>
+          <p style="font-size:14.5px;color:var(--dim);line-height:1.65">Language models read facts out
+          of source pages — disease, place, counts, dates. <b style="color:var(--txt)">Every risk
+          classification is deterministic code.</b> A health authority must be able to explain why
+          something was rated Critical, and “the model judged it so” is not an explanation that
+          survives review.</p>
+        </div>
+        <div class="panel">
+          <div class="lbl" style="margin-bottom:12px">Uncertainty is stated, not hidden</div>
+          <p style="font-size:14.5px;color:var(--dim);line-height:1.65">Each draft lists what is
+          <i>missing</i> — no case counts, no baseline on record, a single uncorroborated source.
+          Those are precisely the things overlooked under load.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7 · LIVE STATE -->
+  <section class="slide">
+    <div class="eyebrow"><span class="dot"></span><span class="lbl lbl-teal">Operating today</span></div>
+    <h2>What the platform is doing right now</h2>
+    <p class="sub">Live production figures, not projections. The system runs unattended on a
+    six-hourly cycle.</p>
+    <div style="height:28px"></div>
+
+    <div class="grid g4" style="gap:20px">
+      <div class="panel"><div class="stat sm teal">249</div><div class="stat-note">events collected and scored</div></div>
+      <div class="panel"><div class="stat sm">117</div><div class="stat-note">countries with reporting</div></div>
+      <div class="panel"><div class="stat sm warn">19</div><div class="stat-note">cleared the IHR threshold</div></div>
+      <div class="panel"><div class="stat sm crit">16</div><div class="stat-note">promoted to triage automatically</div></div>
+    </div>
+    <div style="height:20px"></div>
+    <div class="grid g4" style="gap:20px">
+      <div class="panel"><div class="stat sm">32</div><div class="stat-note">sources collecting cleanly</div></div>
+      <div class="panel"><div class="stat sm">51</div><div class="stat-note">social signals from X</div></div>
+      <div class="panel"><div class="stat sm">64</div><div class="stat-note">watch terms — 28 in Arabic</div></div>
+      <div class="panel"><div class="stat sm">45</div><div class="stat-note">disease baselines encoded</div></div>
+    </div>
+
+    <div style="height:24px"></div>
+    <div class="panel">
+      <div class="lbl" style="margin-bottom:16px">Currently in the analyst queue</div>
+      <div class="grid g3" style="gap:13px">
+        <div style="display:flex;gap:11px;align-items:baseline"><span class="pill c">Critical</span><span style="font-size:14px">MERS-CoV — Saudi Arabia</span></div>
+        <div style="display:flex;gap:11px;align-items:baseline"><span class="pill c">Critical</span><span style="font-size:14px">Meningococcal disease — Sudan</span></div>
+        <div style="display:flex;gap:11px;align-items:baseline"><span class="pill c">Critical</span><span style="font-size:14px">Wild poliovirus — Pakistan</span></div>
+        <div style="display:flex;gap:11px;align-items:baseline"><span class="pill w">High</span><span style="font-size:14px">Cholera — Yemen</span></div>
+        <div style="display:flex;gap:11px;align-items:baseline"><span class="pill w">High</span><span style="font-size:14px">Avian influenza H5N1 — Egypt</span></div>
+        <div style="display:flex;gap:11px;align-items:baseline"><span class="pill w">High</span><span style="font-size:14px">Measles — Uganda</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 8 · ARCHITECTURE -->
+  <section class="slide">
+    <div class="eyebrow"><span class="dot"></span><span class="lbl lbl-teal">Architecture</span></div>
+    <h2>Serverless, with one small machine for the hard pages</h2>
+    <p class="sub">Nothing to patch on a Friday night. The platform scales to zero when idle and
+    costs nothing while nothing is happening.</p>
+    <div style="height:28px"></div>
+
+    <div class="grid g3" style="gap:20px">
+      <div class="panel">
+        <div class="lbl lbl-teal" style="margin-bottom:14px">Edge</div>
+        <h3 style="margin-bottom:12px">Cloudflare</h3>
+        <ul class="clean" style="gap:10px;font-size:14px">
+          <li><span class="mk">▪</span><span><b>Workers</b> — API and scheduled collector</span></li>
+          <li><span class="mk">▪</span><span><b>Pages</b> — the analyst interface</span></li>
+          <li><span class="mk">▪</span><span><b>Hyperdrive</b> — pooled database access</span></li>
+        </ul>
+      </div>
+      <div class="panel">
+        <div class="lbl lbl-teal" style="margin-bottom:14px">Data</div>
+        <h3 style="margin-bottom:12px">Neon Postgres</h3>
+        <ul class="clean" style="gap:10px;font-size:14px">
+          <li><span class="mk">▪</span><span>Serverless Postgres, London region</span></li>
+          <li><span class="mk">▪</span><span>Every score stored with its evidence</span></li>
+          <li><span class="mk">▪</span><span>Point-in-time recovery</span></li>
+        </ul>
+      </div>
+      <div class="panel">
+        <div class="lbl lbl-teal" style="margin-bottom:14px">Rendering</div>
+        <h3 style="margin-bottom:12px">Dedicated crawler</h3>
+        <ul class="clean" style="gap:10px;font-size:14px">
+          <li><span class="mk">▪</span><span>Hetzner, Germany — 2 vCPU / 4 GB</span></li>
+          <li><span class="mk">▪</span><span>Runs a real browser for pages that need one</span></li>
+          <li><span class="mk">▪</span><span>Unlocks RKI, China CDC, WHO dashboards</span></li>
+        </ul>
       </div>
     </div>
 
-    <!-- SLIDE 8: SECURITY, GOVERNANCE & ADMIN CONTROLS -->
-    <div class="slide flex-col justify-between h-full relative z-10">
-      <div class="flex justify-between items-start border-b border-white/10 pb-4">
-        <div>
-          <span class="text-xs md:text-sm font-black uppercase text-ghi-teal tracking-widest">Enterprise Architecture</span>
-          <h2 class="text-3xl md:text-5xl font-black text-white uppercase tracking-tight mt-1">
-            Security, Governance & Admin Controls
-          </h2>
-        </div>
-        <span class="px-4 py-1.5 rounded-full text-xs font-black uppercase bg-white/5 text-slate-300 border border-white/10">08 // 08</span>
+    <div style="height:22px"></div>
+    <div class="grid g2" style="gap:20px">
+      <div class="panel">
+        <div class="lbl" style="margin-bottom:14px">Security posture</div>
+        <ul class="clean" style="gap:10px;font-size:14px">
+          <li><span class="mk">▪</span><span>Every endpoint requires a session — <b>nothing is public</b></span></li>
+          <li><span class="mk">▪</span><span>Access restricted to <b>@pha.gov.sa</b> accounts</span></li>
+          <li><span class="mk">▪</span><span>Role-based permissions per view</span></li>
+          <li><span class="mk">▪</span><span>Only open-source reporting is collected — no personal data</span></li>
+        </ul>
+      </div>
+      <div class="panel">
+        <div class="lbl" style="margin-bottom:14px">Cost control by design</div>
+        <ul class="clean" style="gap:10px;font-size:14px">
+          <li><span class="mk">▪</span><span>Pages re-read only when their content changes</span></li>
+          <li><span class="mk">▪</span><span>Feeds send only entries not already seen</span></li>
+          <li><span class="mk">▪</span><span>Per-source spend recorded and reportable</span></li>
+          <li><span class="mk">▪</span><span>Hard budget caps on every paid interface</span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 9 · COST -->
+  <section class="slide">
+    <div class="eyebrow"><span class="dot"></span><span class="lbl lbl-teal">Total cost of ownership</span></div>
+    <h2>Around 350 riyals a month</h2>
+    <p class="sub">Measured from live operation, not estimated. No licences, no per-seat charges, no
+    minimum commitments.</p>
+    <div style="height:24px"></div>
+
+    <div class="grid g2" style="gap:30px;align-items:start">
+      <div class="panel">
+        <table>
+          <thead><tr><th>Component</th><th>Purpose</th><th style="text-align:right">SAR / month</th></tr></thead>
+          <tbody>
+            <tr><td class="k">Hetzner CX22</td><td>Browser rendering</td><td class="num">120</td></tr>
+            <tr><td class="k">X (Twitter) API</td><td>Social listening</td><td class="num">100</td></tr>
+            <tr><td class="k">Claude API</td><td>Reading source pages</td><td class="num">~75</td></tr>
+            <tr><td class="k">Neon Postgres</td><td>Database</td><td class="num">35</td></tr>
+            <tr><td class="k">Cloudflare Workers</td><td>API, interface, scheduling</td><td class="num">20</td></tr>
+            <tr style="border-top:1px solid rgba(0,242,255,.25)">
+              <td class="k" style="color:var(--teal);font-weight:800;padding-top:15px">Total</td><td></td>
+              <td class="num" style="color:var(--teal);font-size:22px;padding-top:15px">≈ 350</td></tr>
+          </tbody>
+        </table>
+        <p style="font-size:12px;color:var(--dimmer);margin-top:15px;line-height:1.6">
+        The Claude API line is usage-based and varies with how much the world's health agencies
+        publish. A worst-case month — every source changing on every scan — would reach roughly
+        300 SAR; measured operation runs well below that.</p>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 my-auto text-xs">
-        <div class="p-6 rounded-2xl bg-white/[0.03] border border-white/10 space-y-3">
-          <h3 class="text-base font-black text-white uppercase">Domain Enforcement</h3>
-          <p class="text-slate-300 leading-relaxed font-medium">
-            Strict authentication enforcing <strong>@pha.gov.sa</strong> email domains across all system user accounts.
-          </p>
+      <div style="display:flex;flex-direction:column;gap:20px">
+        <div class="panel accent">
+          <div class="lbl lbl-teal" style="margin-bottom:12px">In context</div>
+          <div class="stat" style="font-size:40px">4,200 SAR</div>
+          <p class="stat-note" style="font-size:15px">per year, fully operational — roughly the cost of
+          one staff-day per month.</p>
         </div>
 
-        <div class="p-6 rounded-2xl bg-white/[0.03] border border-white/10 space-y-3">
-          <h3 class="text-base font-black text-white uppercase">Role Permissions (RBAC)</h3>
-          <p class="text-slate-300 leading-relaxed font-medium">
-            Granular access controls across Superadmin, Director, Health Expert, and Analyst roles.
-          </p>
-        </div>
-
-        <div class="p-6 rounded-2xl bg-white/[0.03] border border-white/10 space-y-3">
-          <h3 class="text-base font-black text-white uppercase">Reporting Exporter</h3>
-          <p class="text-slate-300 leading-relaxed font-medium">
-            Formatted weekly epidemiological report exporter ready for integration with the Tabadul platform.
-          </p>
+        <div class="panel">
+          <div class="lbl" style="margin-bottom:18px">What engineering changed</div>
+          <div style="margin-bottom:8px;display:flex;justify-content:space-between;font-size:13px">
+            <span style="color:var(--dim)">Original design</span>
+            <span class="mono" style="color:var(--critical);font-weight:700">~3,750 SAR / mo</span></div>
+          <div class="bar" style="margin-bottom:18px"><i style="width:100%;background:linear-gradient(90deg,#FF3131,#ff6b6b)"></i></div>
+          <div style="margin-bottom:8px;display:flex;justify-content:space-between;font-size:13px">
+            <span style="color:var(--dim)">Today</span>
+            <span class="mono" style="color:var(--good);font-weight:700">~350 SAR / mo</span></div>
+          <div class="bar"><i style="width:9.3%;background:linear-gradient(90deg,#00F2FF,#3DDC97)"></i></div>
+          <p style="font-size:12.5px;color:var(--dimmer);margin-top:15px;line-height:1.6">
+          Achieved by reading each page only when it changes, sending only unseen feed entries, and
+          matching the model to the task rather than using the largest available for everything.</p>
         </div>
       </div>
+    </div>
+  </section>
 
-      <div class="flex justify-between items-center text-xs text-slate-400 pt-4 border-t border-white/10">
-        <span>Maintained by: Global Health Intelligence Development Team</span>
-        <span class="text-[#00A896] font-bold uppercase">PUBLIC HEALTH AUTHORITY</span>
+  <!-- 10 · ROADMAP -->
+  <section class="slide">
+    <div class="eyebrow"><span class="dot"></span><span class="lbl lbl-teal">Where it goes next</span></div>
+    <h2>Operational today, stronger each quarter</h2>
+    <p class="sub">The platform is running in production. The work ahead deepens judgement rather than
+    adding surface.</p>
+    <div style="height:28px"></div>
+
+    <div class="grid g3" style="gap:20px">
+      <div class="panel">
+        <span class="pill g" style="margin-bottom:16px;display:inline-block">Delivered</span>
+        <ul class="clean" style="gap:11px;font-size:14px">
+          <li><span class="mk">✓</span><span>59-source registry with credibility tiers</span></li>
+          <li><span class="mk">✓</span><span>IHR Annex 2 scoring and auto-promotion</span></li>
+          <li><span class="mk">✓</span><span>Machine-drafted assessments with human override</span></li>
+          <li><span class="mk">✓</span><span>Social listening in Arabic and English</span></li>
+          <li><span class="mk">✓</span><span>Browser rendering for JavaScript-heavy sources</span></li>
+          <li><span class="mk">✓</span><span>Full audit trail on every decision</span></li>
+        </ul>
+      </div>
+      <div class="panel">
+        <span class="pill w" style="margin-bottom:16px;display:inline-block">Next</span>
+        <ul class="clean" style="gap:11px;font-size:14px">
+          <li><span class="mk">▸</span><span><b>Disease name normalisation</b> — so two agencies reporting one outbreak count as corroboration</span></li>
+          <li><span class="mk">▸</span><span><b>PDF extraction</b> — several agencies publish only as attachments</span></li>
+          <li><span class="mk">▸</span><span><b>Hajj &amp; Umrah windows</b> — raised sensitivity during mass gatherings</span></li>
+          <li><span class="mk">▸</span><span><b>Baseline curation</b> by PHA epidemiologists</span></li>
+        </ul>
+      </div>
+      <div class="panel">
+        <span class="pill n" style="margin-bottom:16px;display:inline-block">Under consideration</span>
+        <ul class="clean" style="gap:11px;font-size:14px">
+          <li><span class="mk">▸</span><span>Scheduled executive briefing by email</span></li>
+          <li><span class="mk">▸</span><span>Arabic interface for the analyst views</span></li>
+          <li><span class="mk">▸</span><span>Integration with national notification workflows</span></li>
+          <li><span class="mk">▸</span><span>Historical trend analysis across seasons</span></li>
+        </ul>
       </div>
     </div>
 
-    <!-- Bottom Footer Controls -->
-    <footer class="flex justify-between items-center z-10 pt-4 border-t border-white/10 text-xs shrink-0">
-      <div class="flex items-center gap-2 text-slate-400 font-bold uppercase">
-        <span class="w-2.5 h-2.5 rounded-full bg-ghi-teal animate-ping"></span>
-        <span>Use Left/Right Arrow Keys or Space to Navigate</span>
+    <div style="height:24px"></div>
+    <div class="panel">
+      <div class="lbl" style="margin-bottom:12px">The most valuable dataset is not code</div>
+      <p style="font-size:15px;color:var(--dim);line-height:1.65">The 45 disease baselines — what counts
+      as expected, per disease, per country — are the highest-leverage asset in the system. They
+      currently hold indicative starting values. <b style="color:var(--txt)">Curation by PHA
+      epidemiologists would improve every score the platform produces.</b></p>
+    </div>
+  </section>
+
+  <!-- 11 · CLOSE -->
+  <section class="slide">
+    <div class="hero">
+      <div class="eyebrow"><span class="dot"></span><span class="lbl lbl-teal">Summary</span></div>
+      <h2 style="font-size:56px;max-width:1180px">Earlier warning, defensible judgement,<br>at negligible cost</h2>
+      <div style="height:36px"></div>
+      <div class="grid g3" style="gap:24px;max-width:1240px">
+        <div class="panel accent"><div class="stat sm teal">59</div>
+          <p class="stat-note">sources watched continuously, in two languages, without a person opening a browser</p></div>
+        <div class="panel accent"><div class="stat sm teal">4</div>
+          <p class="stat-note">IHR Annex 2 questions answered on every signal, with the evidence recorded</p></div>
+        <div class="panel accent"><div class="stat sm teal">350</div>
+          <p class="stat-note">riyals per month to operate the entire platform</p></div>
       </div>
+      <div style="height:42px"></div>
+      <p class="sub" style="max-width:920px;font-size:18px">
+        GHI does not replace an epidemiologist. It ensures that when one sits down, the work in front
+        of them is the work that matters — and that every decision the Authority takes can be
+        explained, months later, to whoever asks.</p>
+    </div>
+  </section>
 
-      <!-- Slide Indicators Dots -->
-      <div class="flex items-center gap-2" id="dots-container">
-        <!-- JS generated dots -->
-      </div>
-    </footer>
-  </main>
+</div>
+</div>
 
-  <script>
-    let currentSlide = 0;
-    const slides = document.querySelectorAll('.slide');
-    const totalSlides = slides.length;
-    const slideNum = document.getElementById('slide-num');
-    const slideTotal = document.getElementById('slide-total');
-    const dotsContainer = document.getElementById('dots-container');
+<div id="nav">
+  <button onclick="go(-1)" title="Previous">&#8249;</button>
+  <span id="counter" class="mono">01 / 11</span>
+  <button onclick="go(1)" title="Next">&#8250;</button>
+  <button onclick="fs()" title="Fullscreen" style="padding:0 10px;font-size:10px;letter-spacing:.1em">FULL</button>
+</div>
+<div id="hint">&#8592; &#8594; navigate &middot; F fullscreen</div>
 
-    slideTotal.textContent = totalSlides;
+<script>
+var slides=[].slice.call(document.querySelectorAll('.slide'));
+var chapters=['Public Health Authority','The Problem','Workflow','Method','Coverage',
+              'Analyst Experience','Live Operation','Architecture','Cost','Roadmap','Summary'];
+var i=0;
 
-    // Create Indicator Dots
-    slides.forEach((_, idx) => {
-      const dot = document.createElement('button');
-      dot.className = `w-3 h-3 rounded-full transition-all cursor-pointer ${idx === 0 ? 'bg-ghi-teal w-8' : 'bg-white/20 hover:bg-white/40'}`;
-      dot.onclick = () => goToSlide(idx);
-      dotsContainer.appendChild(dot);
-    });
+function show(n){
+  slides[i].classList.remove('on');
+  i=Math.max(0,Math.min(slides.length-1,n));
+  void slides[i].offsetWidth;              /* restart the entry animation */
+  slides[i].classList.add('on');
+  document.getElementById('counter').textContent=
+    ('0'+(i+1)).slice(-2)+' / '+('0'+slides.length).slice(-2);
+  document.getElementById('prog').style.width=((i+1)/slides.length*100)+'%';
+  document.getElementById('chapter').textContent=chapters[i]||'';
+}
+function go(d){show(i+d)}
+function fs(){document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen()}
 
-    function updateSlide() {
-      slides.forEach((slide, idx) => {
-        if (idx === currentSlide) {
-          slide.classList.add('active');
-        } else {
-          slide.classList.remove('active');
-        }
-      });
+addEventListener('keydown',function(e){
+  if(['ArrowRight','PageDown',' ','Enter'].indexOf(e.key)>-1){e.preventDefault();go(1)}
+  else if(['ArrowLeft','PageUp','Backspace'].indexOf(e.key)>-1){e.preventDefault();go(-1)}
+  else if(e.key==='Home'){show(0)}
+  else if(e.key==='End'){show(slides.length-1)}
+  else if(e.key.toLowerCase()==='f'){fs()}
+});
 
-      slideNum.textContent = currentSlide + 1;
+addEventListener('click',function(e){
+  if(e.target.closest('#nav'))return;
+  go(e.clientX>innerWidth/2?1:-1);
+});
 
-      // Update dots
-      const dots = dotsContainer.children;
-      Array.from(dots).forEach((dot, idx) => {
-        if (idx === currentSlide) {
-          dot.className = 'w-8 h-3 rounded-full bg-ghi-teal transition-all';
-        } else {
-          dot.className = 'w-3 h-3 rounded-full bg-white/20 hover:bg-white/40 transition-all';
-        }
-      });
-    }
-
-    function nextSlide() {
-      currentSlide = (currentSlide + 1) % totalSlides;
-      updateSlide();
-    }
-
-    function prevSlide() {
-      currentSlide = (currentSlide - 1 + totalSlides) % totalSlides;
-      updateSlide();
-    }
-
-    function goToSlide(idx) {
-      currentSlide = idx;
-      updateSlide();
-    }
-
-    function toggleFullscreen() {
-      if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen();
-      } else {
-        if (document.exitFullscreen) {
-          document.exitFullscreen();
-        }
-      }
-    }
-
-    // Keyboard Shortcuts
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowRight' || e.key === ' ') {
-        nextSlide();
-      } else if (e.key === 'ArrowLeft') {
-        prevSlide();
-      } else if (e.key === 'f' || e.key === 'F') {
-        toggleFullscreen();
-      }
-    });
-  </script>
+/* Scale the fixed 16:9 canvas to whatever the room's projector gives us,
+   rather than reflowing — a deck must look identical everywhere. */
+function fit(){
+  document.getElementById('canvas').style.transform=
+    'scale('+Math.min(innerWidth/1600,innerHeight/900)*0.97+')';
+}
+addEventListener('resize',fit);
+fit();
+show(0);
+</script>
 </body>
 </html>
