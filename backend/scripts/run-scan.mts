@@ -47,7 +47,15 @@ const db = drizzle(client, { schema });
 
 const started = Date.now();
 try {
-  const result: any = await fetchGlobalRadarScan(db, { ANTHROPIC_API_KEY: apiKey }, { force: FORCE });
+  // Every binding the collector reads has to be forwarded here, not just the
+  // extraction key — the Worker gets these from wrangler automatically and this
+  // script does not, so a missing one shows up as the source reporting itself
+  // unconfigured rather than as a script bug.
+  const result: any = await fetchGlobalRadarScan(db, {
+    ANTHROPIC_API_KEY: apiKey,
+    CRAWLER_URL: process.env.CRAWLER_URL || fromDevVars('CRAWLER_URL'),
+    CRAWLER_TOKEN: process.env.CRAWLER_TOKEN || fromDevVars('CRAWLER_TOKEN'),
+  }, { force: FORCE });
 
   const secs = ((Date.now() - started) / 1000).toFixed(0);
   console.log(`\nscan finished in ${secs}s — status ${result.status}`);

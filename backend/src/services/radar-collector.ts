@@ -378,6 +378,28 @@ async function retrieveSource(source: RegisteredSource, env?: any): Promise<Fetc
  * switched-off one. That distinction is what the sources drawer shows an
  * operator, and getting it wrong hides an outage behind a design decision.
  */
+/**
+ * Serialises calls to the crawler.
+ *
+ * The scan fans out across sources concurrently, which is right for plain HTTP
+ * fetches against different hosts but wrong here: every browser source targets
+ * the *same* box, and that box has a browser pool sized to its memory — two on
+ * a 4GB machine. Six simultaneous requests queue behind two browsers and every
+ * one of them hits the client timeout, so all six report as unreachable while
+ * the crawler is in fact working perfectly.
+ *
+ * Queuing here rather than raising the timeout keeps the failure honest: a real
+ * outage still surfaces as an outage instead of being masked by a longer wait.
+ */
+let crawlerQueue: Promise<unknown> = Promise.resolve();
+
+function queueOnCrawler<T>(fn: () => Promise<T>): Promise<T> {
+  const run = crawlerQueue.then(fn, fn);
+  // Keep the chain alive regardless of outcome; a rejection must not stall it.
+  crawlerQueue = run.then(() => undefined, () => undefined);
+  return run;
+}
+
 async function renderWithCrawler(source: RegisteredSource, env?: any): Promise<FetchOutcome> {
   const base = env?.CRAWLER_URL;
   const token = env?.CRAWLER_TOKEN;
@@ -396,7 +418,7 @@ async function renderWithCrawler(source: RegisteredSource, env?: any): Promise<F
   const cfg = (source.config ?? {}) as { crawlerWaitMs?: number; crawlerSelector?: string };
 
   try {
-    const res = await fetch(`${base.replace(/\/$/, '')}/crawl`, {
+    const res = await queueOnCrawler(() => fetch(`${base.replace(/\/$/, '')}/crawl`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -409,13 +431,17 @@ async function renderWithCrawler(source: RegisteredSource, env?: any): Promise<F
           params: {
             cache_mode: 'BYPASS',
             page_timeout: 60000,
-            delay_before_return_html: cfg.crawlerWaitMs ?? 3000,
+            // Seconds, not milliseconds — crawl4ai's default is 0.1. Passing
+            // 3000 here asked it to wait fifty minutes before returning, which
+            // presented as every browser source timing out while the crawler
+            // was working perfectly.
+            delay_before_return_html: (cfg.crawlerWaitMs ?? 3000) / 1000,
             ...(cfg.crawlerSelector ? { wait_for: `css:${cfg.crawlerSelector}` } : {}),
           },
         },
       }),
-      signal: AbortSignal.timeout(90000),
-    });
+      signal: AbortSignal.timeout(120000),
+    }));
 
     if (res.status === 401 || res.status === 403) {
       return { body: null, status: 'http_error', detail: 'Crawler rejected the token' };
