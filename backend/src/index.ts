@@ -47,14 +47,20 @@ const jwtSecret = (env: Bindings): string => {
 // (RSS readers, cron, curl) send no Origin and are unaffected by this.
 const ALLOWED_ORIGINS = [
     'https://ghi-pha.pages.dev',
-    'http://localhost:5173',
-    'http://127.0.0.1:5173',
 ];
+
+// Vite takes the next free port when 5173 is busy, which silently breaks the
+// dev front end with a bare "Failed to fetch" and no CORS message anywhere
+// obvious. The range is bounded rather than "any localhost" so this stays a
+// development convenience and not a hole: only a browser on the developer's
+// own machine can present these origins.
+const LOCAL_ORIGIN = /^http:\/\/(localhost|127\.0\.0\.1):(517[0-9])$/;
 
 app.use('*', cors({
     origin: (origin) => {
         if (!origin) return undefined;
         if (ALLOWED_ORIGINS.includes(origin)) return origin;
+        if (LOCAL_ORIGIN.test(origin)) return origin;
         // Cloudflare Pages preview deployments: <hash>.ghi-pha.pages.dev
         if (/^https:\/\/[a-z0-9-]+\.ghi-pha\.pages\.dev$/.test(origin)) return origin;
         return undefined;

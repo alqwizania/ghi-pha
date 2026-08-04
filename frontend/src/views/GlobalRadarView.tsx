@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup } from 'react-simple-maps';
+import { geoCentroid } from 'd3-geo';
 import { 
   Globe, 
   Radio, 
@@ -18,6 +19,47 @@ import {
 import { API_BASE_URL, fetchRadarEvents, fetchRadarSources, triggerRadarScan, promoteRadarEvent } from '../lib/api';
 
 const geoUrl = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
+
+/**
+ * Two-letter code for a country label.
+ *
+ * The 110m world atlas carries no ISO codes, so codes are held here for the
+ * countries GHI actually reports on and derived from the name otherwise.
+ * Derivation is a fallback, not the rule: initials would render Sudan and
+ * South Sudan identically, and on a threat map that is not a cosmetic error.
+ */
+const COUNTRY_CODES: Record<string, string> = {
+  'Saudi Arabia': 'SA', 'Yemen': 'YE', 'Oman': 'OM', 'United Arab Emirates': 'AE',
+  'Qatar': 'QA', 'Bahrain': 'BH', 'Kuwait': 'KW', 'Iraq': 'IQ', 'Iran': 'IR',
+  'Jordan': 'JO', 'Syria': 'SY', 'Lebanon': 'LB', 'Israel': 'IL', 'Egypt': 'EG',
+  'Sudan': 'SD', 'South Sudan': 'SS', 'Eritrea': 'ER', 'Djibouti': 'DJ',
+  'Ethiopia': 'ET', 'Somalia': 'SO', 'Kenya': 'KE', 'Uganda': 'UG', 'Tanzania': 'TZ',
+  'Dem. Rep. Congo': 'CD', 'Congo': 'CG', 'Nigeria': 'NG', 'Niger': 'NE', 'Chad': 'TD',
+  'Mali': 'ML', 'Burkina Faso': 'BF', 'Ghana': 'GH', 'Cameroon': 'CM',
+  'Central African Rep.': 'CF', 'Angola': 'AO', 'Zambia': 'ZM', 'Zimbabwe': 'ZW',
+  'Mozambique': 'MZ', 'Malawi': 'MW', 'Madagascar': 'MG', 'South Africa': 'ZA',
+  'Morocco': 'MA', 'Algeria': 'DZ', 'Tunisia': 'TN', 'Libya': 'LY',
+  'Pakistan': 'PK', 'Afghanistan': 'AF', 'India': 'IN', 'Bangladesh': 'BD',
+  'Nepal': 'NP', 'Sri Lanka': 'LK', 'China': 'CN', 'Japan': 'JP', 'South Korea': 'KR',
+  'North Korea': 'KP', 'Vietnam': 'VN', 'Thailand': 'TH', 'Cambodia': 'KH',
+  'Laos': 'LA', 'Myanmar': 'MM', 'Malaysia': 'MY', 'Indonesia': 'ID',
+  'Philippines': 'PH', 'Papua New Guinea': 'PG', 'Australia': 'AU', 'New Zealand': 'NZ',
+  'Russia': 'RU', 'Turkey': 'TR', 'Ukraine': 'UA', 'Poland': 'PL', 'Germany': 'DE',
+  'France': 'FR', 'Spain': 'ES', 'Portugal': 'PT', 'Italy': 'IT', 'Greece': 'GR',
+  'United Kingdom': 'GB', 'Ireland': 'IE', 'Netherlands': 'NL', 'Belgium': 'BE',
+  'Switzerland': 'CH', 'Austria': 'AT', 'Czechia': 'CZ', 'Romania': 'RO',
+  'Bulgaria': 'BG', 'Serbia': 'RS', 'Croatia': 'HR', 'Hungary': 'HU',
+  'Sweden': 'SE', 'Norway': 'NO', 'Finland': 'FI', 'Denmark': 'DK',
+  'United States of America': 'US', 'Canada': 'CA', 'Mexico': 'MX', 'Brazil': 'BR',
+  'Argentina': 'AR', 'Chile': 'CL', 'Peru': 'PE', 'Colombia': 'CO',
+  'Venezuela': 'VE', 'Bolivia': 'BO', 'Ecuador': 'EC', 'Paraguay': 'PY',
+  'Uruguay': 'UY', 'Cuba': 'CU', 'Haiti': 'HT', 'Dominican Rep.': 'DO',
+  'Guatemala': 'GT', 'Honduras': 'HN', 'Nicaragua': 'NI', 'Costa Rica': 'CR',
+  'Panama': 'PA', 'Kazakhstan': 'KZ', 'Uzbekistan': 'UZ', 'Mongolia': 'MN',
+};
+
+const countryCode = (name: string): string =>
+  COUNTRY_CODES[name] ?? name.replace(/[^A-Za-z ]/g, '').slice(0, 2).toUpperCase();
 
 interface GlobalRadarViewProps {
   user?: any;
@@ -302,6 +344,9 @@ export default function GlobalRadarView({ onPromoteToTriage }: GlobalRadarViewPr
     return true;
   });
 
+  // Countries currently reporting, so their code stays visible at any zoom.
+  const eventCountries = new Set<string>(filteredEvents.map((e: any) => e.country));
+
   return (
     <div className="relative w-full h-[calc(100vh-170px)] min-h-[500px] rounded-3xl overflow-hidden border border-white/10 bg-[#060a14] shadow-2xl">
       
@@ -339,10 +384,64 @@ export default function GlobalRadarView({ onPromoteToTriage }: GlobalRadarViewPr
               }
             </Geographies>
 
+            {/*
+              Country initials.
+              Deliberately quiet: this is a threat map, and a full label set
+              competes with the markers for the same attention. Codes appear
+              only where they earn their place — the Kingdom always, countries
+              currently reporting an event always, and everything else only
+              once the operator has zoomed in far enough to be reading a region
+              rather than scanning the globe.
+            */}
+            <Geographies geography={geoUrl}>
+              {({ geographies }: { geographies: any[] }) =>
+                geographies.map((geo: any) => {
+                  const name = geo.properties.name;
+                  const isKSA = name === 'Saudi Arabia';
+                  const hasEvent = eventCountries.has(name);
+                  if (!isKSA && !hasEvent && zoom < 2.2) return null;
+
+                  const centroid = geoCentroid(geo);
+                  if (!centroid || Number.isNaN(centroid[0])) return null;
+
+                  return (
+                    <Marker key={`${geo.rsmKey}-label`} coordinates={centroid as [number, number]}>
+                      <text
+                        textAnchor="middle"
+                        /*
+                          Countries with an event get their code lifted clear of
+                          the marker. Both land on the centroid otherwise, and
+                          Saudi Arabia's code was sitting directly on top of the
+                          MERS dot — the one marker on the map that must stay
+                          readable.
+                        */
+                        dy={hasEvent ? -9 / zoom : 2}
+                        style={{ pointerEvents: 'none', userSelect: 'none' }}
+                        fontSize={9 / zoom}
+                        letterSpacing={1.2 / zoom}
+                        fontWeight={700}
+                        fill={isKSA ? '#00F2FF' : hasEvent ? '#94a3b8' : '#475569'}
+                        opacity={isKSA ? 0.95 : hasEvent ? 0.7 : 0.45}
+                      >
+                        {countryCode(name)}
+                      </text>
+                    </Marker>
+                  );
+                })
+              }
+            </Geographies>
+
             {/* Outbreak Markers at Real Longitude & Latitude */}
             {filteredEvents.map((evt) => {
               const isCritical = evt.riskLevel === 'Critical';
               const isSelected = selectedEvent?.id === evt.id;
+              // Semantic colour, separate from the teal accent: severity has to
+              // read at a glance without matching the interface chrome.
+              const accent = isCritical
+                ? { colour: '#FF3131', core: 3.2, ring: 11 }
+                : evt.riskLevel === 'High'
+                  ? { colour: '#FFB020', core: 2.8, ring: 9 }
+                  : { colour: '#00F2FF', core: 2.4, ring: 8 };
 
               return (
                 <Marker
@@ -350,26 +449,52 @@ export default function GlobalRadarView({ onPromoteToTriage }: GlobalRadarViewPr
                   coordinates={[evt.lng, evt.lat]}
                   onClick={() => setSelectedEvent(evt)}
                 >
-                  <g className="cursor-pointer group">
-                    {/* Animated Pulsing Radar Ring */}
+                  {/*
+                    Counter-scaled by zoom so a marker stays the same size on
+                    screen at every zoom level. Without this, zooming in to read
+                    a region turns each dot into a blot that covers the country
+                    it is marking.
+                  */}
+                  <g className="cursor-pointer group" transform={`scale(${1 / zoom})`}>
+                    {/*
+                      A radar sweep rather than Tailwind's animate-ping. ping
+                      scales the whole element from the centre and fades out
+                      hard, which reads as a bouncing blob; animating the radius
+                      of a stroked ring reads as a sweep expanding outward,
+                      which is what the instrument this borrows from does.
+                      Criticals sweep faster — urgency carried by rhythm rather
+                      than by size.
+                    */}
                     <circle
-                      r={isCritical ? 14 : 10}
-                      fill={isCritical ? "#FF3131" : "#00F2FF"}
-                      opacity="0.35"
-                      className="animate-ping"
-                    />
-                    
-                    {/* Outer Border Circle */}
+                      r={accent.ring}
+                      fill="none"
+                      stroke={accent.colour}
+                      strokeWidth={0.6}
+                      opacity={0.5}
+                    >
+                      <animate attributeName="r" values={`${accent.core};${accent.ring}`}
+                        dur={isCritical ? '1.8s' : '2.8s'} repeatCount="indefinite" />
+                      <animate attributeName="opacity" values="0.55;0"
+                        dur={isCritical ? '1.8s' : '2.8s'} repeatCount="indefinite" />
+                    </circle>
+
+                    {/* A soft halo keeps the dot legible over dark landmass. */}
+                    <circle r={accent.core + 1.6} fill={accent.colour} opacity={0.18} />
+
                     <circle
-                      r={isCritical ? 8 : 6}
-                      fill={isCritical ? "#FF3131" : "#00F2FF"}
-                      stroke="#ffffff"
-                      strokeWidth={isSelected ? 2 : 1}
-                      className="transition-transform duration-300 group-hover:scale-150"
+                      r={accent.core}
+                      fill={accent.colour}
+                      stroke="#060a14"
+                      strokeWidth={0.5}
+                      className="transition-all duration-300 group-hover:opacity-80"
                     />
 
-                    {/* Inner Center Dot */}
-                    <circle r="2" fill="#ffffff" />
+                    {/* Selection is a ring, not a size change — the marker must
+                        not move or grow when it becomes the active one. */}
+                    {isSelected && (
+                      <circle r={accent.core + 3} fill="none" stroke="#ffffff"
+                        strokeWidth={0.8} opacity={0.9} />
+                    )}
                   </g>
                 </Marker>
               );
