@@ -315,6 +315,14 @@ export const monitoredAccounts = pgTable("monitored_accounts", {
     description: text("description"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+    // X pay-per-usage state. Ids resolved once (user reads cost twice what post
+    // reads do); lastPostId is the high-water mark that makes a quiet account
+    // free rather than re-billing its last posts. See migration 020.
+    xUserId: varchar("x_user_id", { length: 32 }),
+    lastPostId: varchar("last_post_id", { length: 32 }),
+    redundantWith: varchar("redundant_with", { length: 100 }),
+    lastPolledAt: timestamp("last_polled_at", { withTimezone: true }),
+    postsRead: integer("posts_read").default(0).notNull(),
 });
 
 export const listenerKeywords = pgTable("listener_keywords", {
@@ -326,6 +334,20 @@ export const listenerKeywords = pgTable("listener_keywords", {
     isActive: boolean("is_active").default(true),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+    // Links an Arabic term to its English counterpart so a hit in either
+    // language reports the same concept. See migration 021.
+    pairKey: varchar("pair_key", { length: 80 }),
+});
+
+export const listenerSpend = pgTable("listener_spend", {
+    id: uuid("id").primaryKey().defaultRandom(),
+    polledAt: timestamp("polled_at", { withTimezone: true }).defaultNow().notNull(),
+    platform: varchar("platform", { length: 20 }).default("x").notNull(),
+    postReads: integer("post_reads").default(0).notNull(),
+    userReads: integer("user_reads").default(0).notNull(),
+    costUsd: numeric("cost_usd", { precision: 10, scale: 4 }).default("0").notNull(),
+    accounts: integer("accounts").default(0).notNull(),
+    detail: text("detail"),
 });
 
 // Relations

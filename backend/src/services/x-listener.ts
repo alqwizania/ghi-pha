@@ -99,8 +99,11 @@ export async function resolveUserIds(
             return { ids: {}, userReads: 0, cost: 0, detail: `HTTP ${res.status} resolving handles` };
         }
         const body = await res.json() as { data?: Array<{ id: string; username: string }> };
+        // Keyed lowercase: X returns its own canonical capitalisation, which
+        // rarely matches how a handle was typed into the registry. An exact
+        // match dropped accounts that had in fact resolved successfully.
         const ids: Record<string, string> = {};
-        for (const u of body.data ?? []) ids[`@${u.username}`] = u.id;
+        for (const u of body.data ?? []) ids[`@${u.username}`.toLowerCase()] = u.id;
         const userReads = body.data?.length ?? 0;
         return {
             ids,
