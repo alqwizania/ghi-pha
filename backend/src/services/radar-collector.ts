@@ -358,20 +358,103 @@ async function retrieveSource(source: RegisteredSource, env?: any): Promise<Fetc
     return { body: null, status: 'disabled', detail: 'RSSHub strategy requires a configured RSSHub instance' };
   }
 
-  // Reserved for pages that only assemble their content client-side. Enabling
-  // it needs three things: the `@cloudflare/puppeteer` package, a [browser]
-  // binding in wrangler.toml, and Browser Rendering enabled on the account.
-  // No source is registered with this strategy yet — the scan diagnostics
-  // identify which ones need it (reachable, but extracting nothing).
+  // Pages that assemble their content client-side. A Worker cannot run a
+  // browser, so these go to a crawl4ai instance that can — see
+  // infra/deploy-crawler.sh. It returns markdown rather than HTML, which is
+  // both cleaner for extraction and roughly 40% fewer tokens than stripping
+  // tags out of the raw page.
   if (source.fetchStrategy === 'browser') {
-    return {
-      body: null,
-      status: 'disabled',
-      detail: 'Source requires JavaScript rendering; Browser Rendering is not yet enabled on this Worker',
-    };
+    return renderWithCrawler(source, env);
   }
 
   return safeFetch(source.url, 15000);
+}
+
+/**
+ * Renders a JavaScript-heavy page through the crawl4ai box.
+ *
+ * Failures here are reported as network or parse errors rather than 'disabled'
+ * so a crawler that is down looks like a broken source and not a deliberately
+ * switched-off one. That distinction is what the sources drawer shows an
+ * operator, and getting it wrong hides an outage behind a design decision.
+ */
+async function renderWithCrawler(source: RegisteredSource, env?: any): Promise<FetchOutcome> {
+  const base = env?.CRAWLER_URL;
+  const token = env?.CRAWLER_TOKEN;
+
+  if (!base || !token) {
+    return {
+      body: null,
+      status: 'disabled',
+      detail: 'Source needs JavaScript rendering; CRAWLER_URL/CRAWLER_TOKEN are not configured',
+    };
+  }
+
+  // Some of these pages take a while to settle — the WHO Mpox dashboard is a
+  // Shiny app that loads its data after first paint — so the wait is generous
+  // and configurable per source rather than a single global guess.
+  const cfg = (source.config ?? {}) as { crawlerWaitMs?: number; crawlerSelector?: string };
+
+  try {
+    const res = await fetch(`${base.replace(/\/$/, '')}/crawl`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        urls: [source.url],
+        crawler_config: {
+          type: 'CrawlerRunConfig',
+          params: {
+            cache_mode: 'BYPASS',
+            page_timeout: 60000,
+            delay_before_return_html: cfg.crawlerWaitMs ?? 3000,
+            ...(cfg.crawlerSelector ? { wait_for: `css:${cfg.crawlerSelector}` } : {}),
+          },
+        },
+      }),
+      signal: AbortSignal.timeout(90000),
+    });
+
+    if (res.status === 401 || res.status === 403) {
+      return { body: null, status: 'http_error', detail: 'Crawler rejected the token' };
+    }
+    if (!res.ok) {
+      return { body: null, status: 'http_error', detail: `Crawler returned HTTP ${res.status}` };
+    }
+
+    const payload = await res.json() as {
+      results?: Array<{ success?: boolean; markdown?: unknown; error_message?: string }>;
+    };
+    const first = payload.results?.[0];
+
+    if (!first?.success) {
+      return {
+        body: null,
+        status: 'parse_error',
+        detail: `Crawler could not render the page: ${first?.error_message ?? 'no result returned'}`,
+      };
+    }
+
+    // crawl4ai returns either a string or {raw_markdown, fit_markdown}. fit is
+    // the de-boilerplated version, which is what we want when it exists.
+    const md = first.markdown as any;
+    const body = typeof md === 'string' ? md : (md?.fit_markdown || md?.raw_markdown || '');
+
+    if (!body || body.trim().length < 40) {
+      return { body: null, status: 'empty', detail: 'Crawler rendered the page but it carried no text' };
+    }
+
+    return { body, status: 'ok', detail: `rendered ${body.length} chars of markdown` };
+  } catch (err) {
+    const msg = String(err);
+    return {
+      body: null,
+      status: msg.includes('timeout') || msg.includes('Timeout') ? 'network_error' : 'network_error',
+      detail: `Crawler unreachable: ${msg.slice(0, 140)}`,
+    };
+  }
 }
 
 // ============================================================

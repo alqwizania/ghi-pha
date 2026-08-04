@@ -17,6 +17,11 @@ type Bindings = {
     // Enables structured extraction. Without it the collector falls back to the
     // legacy title scraper rather than failing.
     ANTHROPIC_API_KEY?: string;
+    // crawl4ai box that renders JavaScript-heavy sources. See infra/deploy-crawler.sh.
+    CRAWLER_URL?: string;
+    CRAWLER_TOKEN?: string;
+    // X (Twitter) pay-per-usage credits for the social listener.
+    X_BEARER_TOKEN?: string;
 };
 
 type SessionUser = {
