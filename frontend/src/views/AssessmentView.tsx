@@ -26,6 +26,9 @@ const AssessmentView = ({ user }: any) => {
     // list, but an analyst still needs to look up what was decided and when.
     const [allAssessments, setAllAssessments] = useState<any[]>([]);
     const [showAll, setShowAll] = useState(false);
+    // The analyst's own words. The derived grounds say what the assessment
+    // concluded; only a person can say why it warrants a director's attention.
+    const [escalationNote, setEscalationNote] = useState('');
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
@@ -86,7 +89,26 @@ const AssessmentView = ({ user }: any) => {
             const payload = { ...ihrAnswers, ...ihrNotes, ...rraData, ihrDecision: decisionFor(yes, mandatory) };
             await updateAssessment(selectedId, payload);
             if (isEscalation) {
-                await escalateAssessment(selectedId, { reason: 'Strategic threshold met', priority: rraData.riskLevel === 'Critical' ? 'Critical' : 'High', userId: user.id });
+                // Was the fixed string 'Strategic threshold met' on every
+                // escalation ever raised. escalation_reason is the field that
+                // justifies the decision on the record, and one sentence that
+                // never varies justifies nothing — a director reading it learnt
+                // only that someone had pressed the button.
+                const a = assessments.find(x => x.id === selectedId);
+                const grounds = [
+                    `${yes} of 4 IHR Annex 2 questions answered yes`,
+                    decisionFor(yes, mandatory),
+                    `RRA risk ${rraData.riskLevel}, confidence ${rraData.confidenceLevel}`,
+                ];
+                if (mandatory) grounds.push('disease is always-notifiable under Annex 2');
+                if (a?.signal?.country) grounds.push(`event in ${a.signal.country}`);
+                if (escalationNote.trim()) grounds.push(`Analyst: ${escalationNote.trim()}`);
+
+                await escalateAssessment(selectedId, {
+                    reason: grounds.join(' · '),
+                    priority: rraData.riskLevel === 'Critical' ? 'Critical' : 'High',
+                    userId: user.id,
+                });
                 loadData();
                 setSelectedId(null);
             }
@@ -446,6 +468,18 @@ const AssessmentView = ({ user }: any) => {
                             </ul>
                         </div>
                     )}
+                </div>
+
+                <div className="space-y-3">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2 block">
+                        Escalation Justification <span className="text-slate-600 normal-case tracking-normal font-medium">— why this needs a director, in your words</span>
+                    </label>
+                    <textarea
+                        value={escalationNote}
+                        onChange={e => setEscalationNote(e.target.value)}
+                        placeholder="Optional. The IHR answers and risk level are attached automatically."
+                        className="w-full h-16 bg-white/[0.02] border border-white/10 rounded-2xl p-4 text-[11px] text-white outline-none focus:ring-1 ring-ghi-teal transition-all placeholder:text-slate-700 resize-none"
+                    />
                 </div>
 
                 <div className="flex gap-4">

@@ -121,6 +121,16 @@ export default function Dashboard() {
       d.maxDeaths = Math.max(d.maxDeaths, e.deaths ?? 0);
     }
 
+    // Is the scorer calibrated? This is the only feedback loop the system has.
+    // Auto-promotion decides what an analyst ever sees, so if analysts reject
+    // most of what it sends, the threshold is wrong — and without this nobody
+    // would find out, because a miscalibrated scorer produces a busy queue that
+    // looks like a working system.
+    const autoDecided = signals.filter(s => s.autoPromoted && s.triageStatus !== 'Pending Triage');
+    const autoAccepted = autoDecided.filter(s => s.triageStatus === 'Accepted').length;
+    const autoRejected = autoDecided.filter(s => s.triageStatus === 'Rejected').length;
+    const autoPrecision = autoDecided.length ? Math.round((autoAccepted / autoDecided.length) * 100) : null;
+
     const activeDiseases = [...byDisease.values()]
       .sort((a, b) =>
         (TIER_RANK[b.topTier] ?? 0) - (TIER_RANK[a.topTier] ?? 0) ||
@@ -146,6 +156,7 @@ export default function Dashboard() {
         Date.now() - new Date(p.postedAt || p.createdAt || 0).getTime() < 86400000).length,
       socialHigh: social.filter((p: any) => Number(p.relevanceScore ?? 0) >= 60).length,
       activeDiseases,
+      autoAccepted, autoRejected, autoPrecision,
     };
   }, [signals, assessments, events, escalations, social, sources]);
 
@@ -447,6 +458,17 @@ export default function Dashboard() {
               <p className="text-2xl font-black text-ghi-teal tabular-nums">{stats.socialToday}</p>
               <p className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Listener 24h</p>
             </div>
+            {/* Scorer calibration. Shown only once analysts have actually
+                triaged auto-promoted signals — a percentage computed from two
+                decisions would be noise dressed as a metric. */}
+            {stats.autoPrecision !== null && (stats.autoAccepted + stats.autoRejected) >= 5 && (
+              <div title={`${stats.autoAccepted} accepted, ${stats.autoRejected} rejected`}>
+                <p className={`text-2xl font-black tabular-nums ${stats.autoPrecision < 50 ? 'text-ghi-warning' : 'text-white'}`}>
+                  {stats.autoPrecision}%
+                </p>
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Auto-Promote Accepted</p>
+              </div>
+            )}
           </div>
         </div>
       )}
