@@ -24,7 +24,11 @@
  * cumulative counts are excluded from the magnitude rules. Both change what a
  * given event scores, so stored scores carry the version that produced them.
  */
-export const SCORER_VERSION = 'ihr-annex2-v2';
+/**
+ * v3 (4 Aug 2026) — confidence is now credibility + independent corroboration
+ * rather than a hardcoded high/medium set.
+ */
+export const SCORER_VERSION = 'ihr-annex2-v3';
 
 /** GCC members plus the neighbours sharing borders, corridors or pilgrim flows. */
 const GCC = new Set(['Saudi Arabia', 'United Arab Emirates', 'UAE', 'Qatar', 'Bahrain', 'Kuwait', 'Oman']);
@@ -72,6 +76,10 @@ export interface ScoringInput {
     countBasis?: CountBasis;
     /** The reporting window as the source worded it, for the evidence trail. */
     countPeriod?: string | null;
+    /** Registry credibility for this source, 0-100. See migration 019. */
+    credibility?: number;
+    /** Independent sources reporting the same event, excluding this one. */
+    corroboratingSources?: number;
 }
 
 /**
@@ -126,6 +134,8 @@ export interface ScoreResult {
     tier: 'critical' | 'high' | 'moderate' | 'routine';
     mandatoryIhr: boolean;
     confidence: 'high' | 'medium' | 'low';
+    /** The full confidence working, so an analyst can see why it is what it is. */
+    confidenceDetail?: ConfidenceResult;
     /**
      * Whether the item describes a disease actually occurring, as opposed to a
      * vaccination campaign, preparedness exercise or funding announcement.
@@ -135,17 +145,119 @@ export interface ScoreResult {
     reportsOccurrence: boolean;
 }
 
-/** Source credibility. Separate from severity: a credible source does not make an outbreak worse. */
-const HIGH_CONFIDENCE_SOURCES = new Set([
-    'WHO_DONS', 'WHO_MPX_API', 'WHO', 'WHO_AFRO', 'WHO_EURO', 'WHO_EMRO_MERS', 'WHO_SEARO',
-    'WHO_WPRO', 'WHO_SITREP', 'WHO_COVID_SITREP', 'ECDC', 'ECDC_CDTR', 'ECDC_OUTBREAKS',
-    'PAHO', 'UK_UKHSA', 'UK_HPR', 'CDC', 'CDC_TRAVEL', 'GPEI_POLIO', 'GTFCC_CHOLERA',
-]);
+/**
+ * Confidence: how much of this can be believed before anyone verifies it.
+ *
+ * Deliberately orthogonal to severity. WHO's Rapid Risk Assessment keeps risk
+ * level and confidence level apart because a Critical rumour and a Critical
+ * confirmed outbreak demand different actions — the first needs verification,
+ * the second needs a response. A single blended number cannot tell an analyst
+ * which one they are looking at, so a credible source never makes an outbreak
+ * *worse*, only better attested.
+ *
+ * Three inputs, all objective:
+ *
+ *   credibility    the source's registry score (migration 019)
+ *   corroboration  how many *independent* sources report the same event
+ *   completeness   whether extraction produced checkable specifics
+ *
+ * Two things people expect here are deliberately absent. The model's own
+ * confidence is not an input: it is uncalibrated and unauditable, and "the
+ * model was sure" is not a defence a health authority can offer. Geographic
+ * proximity is not an input either — a report from Yemen is not *more likely
+ * to be true* for being near the Kingdom, it is more important, and that is
+ * already scored as ksaRelevance.
+ */
+export interface ConfidenceInput {
+    /** Registry credibility, 0–100. Defaults to 70 when a source is unclassified. */
+    credibility?: number;
+    /** Independent sources reporting the same event, excluding this one. */
+    corroboratingSources?: number;
+    /** Days since first report, for decay on anything still uncorroborated. */
+    ageDays?: number;
+    cases?: number | null;
+    deaths?: number | null;
+    dateReported?: string | null;
+    countBasis?: CountBasis;
+}
 
-export function sourceConfidence(sourceId: string, stream: 'radar' | 'listener' = 'radar'): 'high' | 'medium' | 'low' {
+export interface ConfidenceResult {
+    score: number;
+    band: 'high' | 'medium' | 'low';
+    credibility: number;
+    corroboration: number;
+    reasons: string[];
+}
+
+/**
+ * Extraction completeness — a proxy for "is this a specific claim or a vague
+ * one". An event naming a count, a date and a defined reporting period can be
+ * checked against the source; one naming none of them cannot.
+ */
+function completenessBonus(input: ConfidenceInput): { points: number; reasons: string[] } {
+    const reasons: string[] = [];
+    let points = 0;
+    if ((input.cases ?? 0) > 0 || (input.deaths ?? 0) > 0) {
+        points += 4;
+        reasons.push('report carries specific case or death counts');
+    }
+    if (input.dateReported) points += 2;
+    if (input.countBasis && input.countBasis !== 'unknown') {
+        points += 2;
+        reasons.push('the reporting period is stated');
+    }
+    return { points, reasons };
+}
+
+export function assessConfidence(input: ConfidenceInput): ConfidenceResult {
+    const credibility = Math.max(0, Math.min(100, input.credibility ?? 70));
+    const corroborating = Math.max(0, input.corroboratingSources ?? 0);
+    const reasons: string[] = [`source credibility ${credibility}/100`];
+
+    let score = credibility;
+
+    // Independent agreement is the strongest evidence event-based surveillance
+    // produces, and the reason WHO puts verification before risk assessment.
+    // Diminishing returns: the second source is worth far more than the fifth.
+    let corroboration = 0;
+    if (corroborating > 0) {
+        corroboration = Math.round(14 * Math.log2(1 + corroborating));
+        score += corroboration;
+        reasons.push(
+            `${corroborating} independent source${corroborating === 1 ? '' : 's'} report the same event`
+        );
+    }
+
+    const completeness = completenessBonus(input);
+    score += completeness.points;
+    reasons.push(...completeness.reasons);
+
+    // Decay, not freshness. A signal still uncorroborated after a week is less
+    // credible than it looked on day one — nobody else has seen it. A
+    // corroborated one does not decay; agreement does not expire.
+    if (corroborating === 0 && (input.ageDays ?? 0) > 7) {
+        const penalty = Math.min(20, Math.floor(((input.ageDays ?? 0) - 7) / 7) * 5 + 5);
+        score -= penalty;
+        reasons.push(`still uncorroborated after ${Math.floor(input.ageDays ?? 0)} days`);
+    }
+
+    score = Math.max(0, Math.min(100, score));
+    const band: ConfidenceResult['band'] = score >= 85 ? 'high' : score >= 60 ? 'medium' : 'low';
+
+    return { score, band, credibility, corroboration, reasons };
+}
+
+/** Back-compatible band lookup for callers that only need high/medium/low. */
+export function sourceConfidence(
+    sourceId: string,
+    stream: 'radar' | 'listener' = 'radar',
+    credibility?: number
+): 'high' | 'medium' | 'low' {
+    // The listener is a detection channel, not an evidence base. A social post
+    // never reaches high confidence on its own; corroboration by a registered
+    // source is what graduates it, and that runs through assessConfidence.
     if (stream === 'listener') return 'low';
-    if (HIGH_CONFIDENCE_SOURCES.has(sourceId)) return 'high';
-    return 'medium';
+    return assessConfidence({ credibility }).band;
 }
 
 /**
@@ -439,6 +551,22 @@ export function scoreEvent(
     const tradeTravel = scoreTradeTravel(input, baseline);
     const ksaRelevance = scoreKsaRelevance(input, baseline, now);
 
+    // Confidence is computed alongside the domains but never feeds them: it
+    // changes what an analyst should do about the event, not how bad it is.
+    const confidence = stream === 'listener'
+        ? { score: 30, band: 'low' as const, credibility: 30, corroboration: 0, reasons: ['social listener; unverified by construction'] }
+        : assessConfidence({
+            credibility: input.credibility,
+            corroboratingSources: input.corroboratingSources,
+            ageDays: input.dateReported
+                ? Math.max(0, (now.getTime() - new Date(input.dateReported).getTime()) / 86400000)
+                : 0,
+            cases: input.cases,
+            deaths: input.deaths,
+            dateReported: input.dateReported,
+            countBasis: input.countBasis,
+        });
+
     const ihrDomains = [severity, unusualness, spread, tradeTravel];
     const domainsAtTwo = ihrDomains.filter((d) => d.score >= 2).length;
 
@@ -478,7 +606,8 @@ export function scoreEvent(
         domainsAtTwo,
         tier,
         mandatoryIhr,
-        confidence: sourceConfidence(input.sourceId, stream),
+        confidence: confidence.band,
+        confidenceDetail: confidence,
         reportsOccurrence: occurrence,
     };
 }

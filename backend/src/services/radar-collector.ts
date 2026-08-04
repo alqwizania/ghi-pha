@@ -1225,6 +1225,31 @@ export async function scoreAndPromotePending(
   // not scored and then dropped on its way to triage.
   const sourceRows = await db.query.surveillanceSources.findMany();
   const cutoffs = new Map<string, string>(sourceRows.map((s: any) => [s.id, cutoffForSource(s)]));
+  const credibility = new Map<string, number>(
+    sourceRows.map((s: any) => [s.id, s.credibilityScore ?? 70])
+  );
+
+  // How many *distinct* sources report the same disease in the same country.
+  // Independent agreement is the strongest evidence event-based surveillance
+  // produces; until now it was used only to suppress duplicate triage rows and
+  // never to raise confidence in the event itself.
+  const corroboration = new Map<string, number>();
+  try {
+    const agreement = await db
+      .select({
+        disease: radarEvents.disease,
+        country: radarEvents.country,
+        sources: sql<number>`count(distinct ${radarEvents.sourceId})::int`,
+      })
+      .from(radarEvents)
+      .where(gte(radarEvents.dateReported, cutoffDate(30)))
+      .groupBy(radarEvents.disease, radarEvents.country);
+    for (const row of agreement) {
+      corroboration.set(`${row.disease}::${row.country}`.toLowerCase(), Number(row.sources));
+    }
+  } catch (err) {
+    console.error('[GHI Scoring] Could not compute corroboration; treating events as single-source:', err);
+  }
   const cutoff = cutoffDate();
   const widestCutoff = [...cutoffs.values(), cutoff].sort()[0];
 
@@ -1277,6 +1302,12 @@ export async function scoreAndPromotePending(
           indicators: (evt.indicators ?? undefined) as EpiIndicators | undefined,
           countBasis: (evt.countBasis ?? 'unknown') as CountBasis,
           countPeriod: evt.countPeriod,
+          credibility: credibility.get(evt.sourceId ?? '') ?? 70,
+          // Minus one: the event's own source is not corroboration of itself.
+          corroboratingSources: Math.max(
+            0,
+            (corroboration.get(`${evt.disease}::${evt.country}`.toLowerCase()) ?? 1) - 1
+          ),
         },
         baselines
       );
@@ -1293,6 +1324,9 @@ export async function scoreAndPromotePending(
         mandatoryIhr: result.mandatoryIhr,
         confidence: result.confidence,
         reportsOccurrence: result.reportsOccurrence,
+        credibility: result.confidenceDetail?.credibility ?? 70,
+        corroboration: result.confidenceDetail?.corroboration ?? 0,
+        confidenceScore: result.confidenceDetail?.score ?? 0,
         evidence: {
           severity: result.severity.reasons,
           unusualness: result.unusualness.reasons,
@@ -1317,6 +1351,9 @@ export async function scoreAndPromotePending(
           mandatoryIhr: result.mandatoryIhr,
           confidence: result.confidence,
           reportsOccurrence: result.reportsOccurrence,
+          credibility: result.confidenceDetail?.credibility ?? 70,
+          corroboration: result.confidenceDetail?.corroboration ?? 0,
+          confidenceScore: result.confidenceDetail?.score ?? 0,
           evidence: {
             severity: result.severity.reasons,
             unusualness: result.unusualness.reasons,

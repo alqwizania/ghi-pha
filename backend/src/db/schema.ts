@@ -122,6 +122,9 @@ export const surveillanceSources = pgTable("surveillance_sources", {
     tags: jsonb("tags").default([]).notNull(),
     config: jsonb("config").default({}).notNull(),
     disabledReason: text("disabled_reason"),
+    // How much this source can be believed before verification. See migration 019.
+    credibilityScore: integer("credibility_score").default(70).notNull(),
+    credibilityTier: varchar("credibility_tier", { length: 24 }).default("unclassified").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
@@ -231,6 +234,10 @@ export const eventScores = pgTable("event_scores", {
     confidence: varchar("confidence", { length: 10 }).default("medium").notNull(),
     evidence: jsonb("evidence").default({}).notNull(),
     reportsOccurrence: boolean("reports_occurrence").default(true).notNull(),
+    // Confidence working, stored so an escalation can be defended. See migration 019.
+    credibility: integer("credibility").default(70),
+    corroboration: integer("corroboration").default(0),
+    confidenceScore: integer("confidence_score").default(0),
     scorerVersion: varchar("scorer_version", { length: 20 }).notNull(),
     scoredAt: timestamp("scored_at", { withTimezone: true }).defaultNow().notNull(),
 });
