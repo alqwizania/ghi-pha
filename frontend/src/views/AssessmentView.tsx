@@ -22,6 +22,10 @@ const decisionFor = (yesCount: number, mandatory: boolean) => {
 
 const AssessmentView = ({ user }: any) => {
     const [assessments, setAssessments] = useState<any[]>([]);
+    // Escalated and completed records stay reachable: the queue is the working
+    // list, but an analyst still needs to look up what was decided and when.
+    const [allAssessments, setAllAssessments] = useState<any[]>([]);
+    const [showAll, setShowAll] = useState(false);
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
@@ -37,14 +41,14 @@ const AssessmentView = ({ user }: any) => {
         setLoading(true);
         fetchAssessments()
             .then(data => {
-                // Filter and auto-select must agree. Selecting from the
-                // unfiltered list could land on an assessment the queue does
-                // not contain, leaving the view with nothing to render.
-                const open = data.filter(isOpenAssessment);
-                setAssessments(open);
-                if (open.length > 0 && !selectedId) {
-                    selectAssessment(open[0]);
-                }
+                // The view opens on the queue, never on an assessment. Auto-
+                // selecting the first one meant an analyst arriving at the tab
+                // was already inside a case they had not chosen, with no sense
+                // of how many were waiting or which mattered most — and any
+                // edit they began was against whichever record happened to
+                // sort first.
+                setAssessments(data.filter(isOpenAssessment));
+                setAllAssessments(data);
             })
             .finally(() => setLoading(false));
     };
@@ -100,35 +104,118 @@ const AssessmentView = ({ user }: any) => {
     );
 
     const activeA = assessments.find(a => a.id === selectedId);
-    if (!activeA && assessments.length > 0) return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {assessments.map(a => (
-                <button key={a.id} onClick={() => selectAssessment(a)} className="glass-panel p-6 text-left hover:border-ghi-teal/30 transition-all group">
-                    <div className="flex items-center justify-between mb-2">
-                        <p className="text-[11px] font-black text-ghi-teal uppercase">Signal ID: {a.signal.id.slice(0, 8)}</p>
-                        {a.machineDraft && (
-                            <span className="text-[8px] font-black uppercase tracking-widest text-ghi-warning/80 border border-ghi-warning/30 rounded px-1.5 py-0.5">
-                                Drafted
-                            </span>
-                        )}
-                    </div>
-                    <h3 className="text-white font-black uppercase tracking-wider mb-4">{a.signal.disease}</h3>
-                    <div className="flex items-center justify-between">
-                        <p className="text-slate-500 text-[10px] uppercase font-black">Status: {a.status}</p>
-                        {a.machineDraft && (
-                            <p className="text-[10px] uppercase font-black text-slate-500">{a.machineDraft.ihr?.decision}</p>
-                        )}
-                    </div>
-                </button>
-            ))}
-        </div>
-    );
 
-    if (!activeA) return (
-        <div className="text-center py-20 glass-panel rounded-[2.5rem] border border-white/5">
-            <p className="text-slate-500 font-black text-xs uppercase tracking-[0.3em]">Queue Empty // No assessments required</p>
-        </div>
-    );
+    // The queue. A line listing rather than cards: this is a worklist an
+    // analyst scans down to decide what to open next, and the questions they
+    // are asking — what is it, where, how bad, has anyone touched it — are
+    // comparisons across rows, which a grid of cards makes harder than a table.
+    if (!activeA) {
+        const rows = showAll ? allAssessments : assessments;
+        return (
+            <div className="space-y-6 animate-in fade-in duration-700">
+                <div className="flex flex-wrap items-end justify-between gap-4">
+                    <div>
+                        <h2 className="text-sm font-black text-white uppercase tracking-[0.2em]">Assessment Queue</h2>
+                        <p className="text-[11px] text-slate-500 mt-1">
+                            Signals accepted in triage. Each opens with a machine-drafted IHR Annex 2 answer set and RRA.
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => setShowAll(false)}
+                            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${!showAll ? 'bg-ghi-teal/15 text-ghi-teal border-ghi-teal/40' : 'bg-white/5 text-slate-500 border-white/5'}`}
+                        >
+                            Open ({assessments.length})
+                        </button>
+                        <button
+                            onClick={() => setShowAll(true)}
+                            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${showAll ? 'bg-ghi-teal/15 text-ghi-teal border-ghi-teal/40' : 'bg-white/5 text-slate-500 border-white/5'}`}
+                        >
+                            All ({allAssessments.length})
+                        </button>
+                    </div>
+                </div>
+
+                {rows.length === 0 ? (
+                    <div className="text-center py-20 glass-panel rounded-[2.5rem] border border-white/5">
+                        <p className="text-slate-500 font-black text-xs uppercase tracking-[0.3em] mb-2">Queue Empty</p>
+                        <p className="text-[11px] text-slate-600">Accepting a signal in Triage opens an assessment here.</p>
+                    </div>
+                ) : (
+                    <div className="glass-panel rounded-[2rem] border border-ghi-blue/10 overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse min-w-[840px]">
+                                <thead>
+                                    <tr className="border-b border-white/5 bg-white/[0.02]">
+                                        {['Disease', 'Country', 'Reported', 'Cases / Deaths', 'IHR', 'Risk', 'Confidence', 'Status'].map(h => (
+                                            <th key={h} className="px-5 py-4 text-[9px] font-black text-slate-500 uppercase tracking-[0.15em] whitespace-nowrap">{h}</th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {rows.map(a => {
+                                        const s = a.signal ?? {};
+                                        const risk = a.rraOverallRisk || '—';
+                                        const touched = Boolean(a.humanReviewedAt);
+                                        return (
+                                            <tr
+                                                key={a.id}
+                                                onClick={() => selectAssessment(a)}
+                                                className="border-b border-white/5 last:border-0 hover:bg-ghi-teal/[0.04] cursor-pointer transition-colors"
+                                            >
+                                                <td className="px-5 py-4">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-[12px] font-black text-white">{s.disease || 'Unspecified'}</span>
+                                                        {a.machineDraft && !touched && (
+                                                            <span className="text-[8px] font-black uppercase tracking-widest text-ghi-warning/70 border border-ghi-warning/25 rounded px-1.5 py-0.5">
+                                                                Drafted
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <span className="text-[10px] text-slate-600">{s.sourceName || 'Source not recorded'}</span>
+                                                </td>
+                                                <td className="px-5 py-4 text-[11px] text-slate-300 whitespace-nowrap">{s.country || '—'}</td>
+                                                <td className="px-5 py-4 text-[11px] text-slate-500 whitespace-nowrap tabular-nums">
+                                                    {s.dateReported ? String(s.dateReported).slice(0, 10) : '—'}
+                                                </td>
+                                                <td className="px-5 py-4 text-[11px] text-slate-300 tabular-nums whitespace-nowrap">
+                                                    {(s.cases ?? 0) || (s.deaths ?? 0)
+                                                        ? `${s.cases ?? 0} / ${s.deaths ?? 0}`
+                                                        : <span className="text-slate-600">not stated</span>}
+                                                </td>
+                                                <td className="px-5 py-4 whitespace-nowrap">
+                                                    <span className={`text-[10px] font-black uppercase tracking-wider ${a.ihrDecision === 'Notify WHO' ? 'text-ghi-critical' : 'text-slate-500'}`}>
+                                                        {a.ihrDecision || 'Not answered'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-5 py-4 whitespace-nowrap">
+                                                    <span className={`text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg border ${risk === 'Critical' ? 'bg-ghi-critical/15 text-ghi-critical border-ghi-critical/40'
+                                                        : risk === 'High' ? 'bg-ghi-warning/15 text-ghi-warning border-ghi-warning/40'
+                                                            : 'bg-white/5 text-slate-400 border-white/10'}`}>
+                                                        {risk}
+                                                    </span>
+                                                </td>
+                                                {/* Risk and confidence stay side by side and separate — a
+                                                    Critical rumour and a Critical confirmed outbreak need
+                                                    different actions, and one blended number hides which. */}
+                                                <td className="px-5 py-4 text-[11px] text-slate-400 whitespace-nowrap">{a.rraConfidenceLevel || '—'}</td>
+                                                <td className="px-5 py-4 whitespace-nowrap">
+                                                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">{a.status}</span>
+                                                    <span className="block text-[9px] text-slate-600">
+                                                        {touched ? `reviewed ${new Date(a.humanReviewedAt).toLocaleDateString()}` : 'not yet reviewed'}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    }
 
     const draft = activeA.machineDraft || null;
     const yesCount = Object.values(ihrAnswers).filter(v => v === true).length;

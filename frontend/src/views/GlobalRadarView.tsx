@@ -437,11 +437,15 @@ export default function GlobalRadarView({ onPromoteToTriage }: GlobalRadarViewPr
               const isSelected = selectedEvent?.id === evt.id;
               // Semantic colour, separate from the teal accent: severity has to
               // read at a glance without matching the interface chrome.
+              // Sized for a comfortable click target without becoming the blot
+              // the original 8px markers were. The transparent hit area below
+              // does the rest, so the visible dot never has to grow to be
+              // usable.
               const accent = isCritical
-                ? { colour: '#FF3131', core: 3.2, ring: 11 }
+                ? { colour: '#FF3131', core: 5.0, ring: 13 }
                 : evt.riskLevel === 'High'
-                  ? { colour: '#FFB020', core: 2.8, ring: 9 }
-                  : { colour: '#00F2FF', core: 2.4, ring: 8 };
+                  ? { colour: '#FFB020', core: 4.7, ring: 11.5 }
+                  : { colour: '#00F2FF', core: 4.5, ring: 10.5 };
 
               return (
                 <Marker
@@ -495,6 +499,15 @@ export default function GlobalRadarView({ onPromoteToTriage }: GlobalRadarViewPr
                       <circle r={accent.core + 3} fill="none" stroke="#ffffff"
                         strokeWidth={0.8} opacity={0.9} />
                     )}
+
+                    {/* Invisible hit area. Clicking a marker on a world map is
+                        a fine-motor task, so the target is larger than the dot
+                        rather than the dot being drawn larger than it needs. */}
+                    <circle r={accent.core + 6} fill="transparent" />
+
+                    {/* Native tooltip on hover — reading a marker should not
+                        require selecting it and losing the current selection. */}
+                    <title>{`${evt.disease} — ${evt.country}${evt.cases ? ` · ${evt.cases} cases` : ''}`}</title>
                   </g>
                 </Marker>
               );

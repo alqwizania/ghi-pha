@@ -1,5 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
-import { fetchSignals, fetchAssessments, fetchRadarEvents } from '../lib/api';
+import {
+  fetchSignals, fetchAssessments, fetchRadarEvents,
+  fetchEscalations, fetchSocialSignals, fetchRadarSources,
+} from '../lib/api';
 import { ASSESSMENT_STATUS, isOpenAssessment } from '../lib/pipeline';
 import { Activity, ShieldAlert, Globe, Clock, CheckCircle2, TrendingUp, Layers, BarChart3 } from 'lucide-react';
 
@@ -7,15 +10,26 @@ export default function Dashboard() {
   const [signals, setSignals] = useState<any[]>([]);
   const [assessments, setAssessments] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
+  const [escalations, setEscalations] = useState<any[]>([]);
+  const [social, setSocial] = useState<any[]>([]);
+  const [sources, setSources] = useState<any[]>([]);
 
   useEffect(() => {
-    Promise.all([fetchSignals(), fetchAssessments(), fetchRadarEvents()])
-      .then(([s, a, e]) => {
-        if (s) setSignals(s);
-        if (a) setAssessments(a);
-        if (e) setEvents(e);
-      })
-      .catch(() => { /* panels render their own empty states */ });
+    // allSettled, not all: one failing endpoint should not blank the whole
+    // executive view. Each panel renders its own empty state.
+    Promise.allSettled([
+      fetchSignals(), fetchAssessments(), fetchRadarEvents(),
+      fetchEscalations(), fetchSocialSignals(), fetchRadarSources(),
+    ]).then(([s, a, e, esc, soc, src]) => {
+      if (s.status === 'fulfilled' && s.value) setSignals(s.value);
+      if (a.status === 'fulfilled' && a.value) setAssessments(a.value);
+      if (e.status === 'fulfilled' && e.value) setEvents(e.value);
+      if (esc.status === 'fulfilled' && esc.value) setEscalations(esc.value);
+      if (soc.status === 'fulfilled' && soc.value) setSocial(soc.value);
+      if (src.status === 'fulfilled' && src.value) {
+        setSources(Array.isArray(src.value) ? src.value : src.value.sources ?? []);
+      }
+    });
   }, []);
 
   // GCC members plus the states sharing a border or corridor with the Kingdom.
@@ -46,6 +60,33 @@ export default function Dashboard() {
         (b.dateReported || '').localeCompare(a.dateReported || '')
       );
 
+    // Are the system's eyes open? An executive view that reports zero threats
+    // looks identical whether the world is quiet or the collectors are down,
+    // and that is the single most dangerous ambiguity in a surveillance
+    // dashboard. Source health resolves it.
+    const live = sources.filter((s: any) => s.health === 'live' || s.lastStatus === 'ok').length;
+    const down = sources.filter((s: any) =>
+      ['down', 'http_error', 'network_error', 'parse_error'].includes(s.health ?? s.lastStatus)).length;
+    const blocked = sources.filter((s: any) => (s.health ?? s.lastStatus) === 'disabled').length;
+
+    // How long the oldest untriaged signal has been waiting. A queue that is
+    // growing is an operational fact an executive needs before it becomes an
+    // incident, and a count alone never shows it.
+    const pending = signals.filter(s => s.triageStatus === 'Pending Triage' || !s.triageStatus);
+    const oldestPending = pending.reduce((oldest: number, s: any) => {
+      const t = new Date(s.createdAt || s.dateReported || Date.now()).getTime();
+      return Math.min(oldest, t);
+    }, Date.now());
+    const oldestPendingDays = Math.floor((Date.now() - oldestPending) / 86400000);
+
+    // The statutory line. IHR Article 6 gives 24 hours from assessment, so
+    // "how many reached the threshold" is the obligation, not a statistic.
+    const notifiable = assessments.filter(a => a.ihrDecision === 'Notify WHO');
+    const notifiableUnreviewed = notifiable.filter(a => !a.humanReviewedAt).length;
+
+    const openEscalations = escalations.filter((e: any) =>
+      (e.directorStatus ?? 'Pending Review') !== 'Closed' && !e.resolvedAt);
+
     return {
       total: events.length,
       pendingTriage,
@@ -55,8 +96,16 @@ export default function Dashboard() {
       autoPromoted,
       regionalThreats,
       regionalCount: regionalThreats.length,
+      live, down, blocked, sourceTotal: sources.length,
+      oldestPendingDays,
+      notifiable: notifiable.length,
+      notifiableUnreviewed,
+      openEscalations,
+      socialToday: social.filter((p: any) =>
+        Date.now() - new Date(p.postedAt || p.createdAt || 0).getTime() < 86400000).length,
+      socialHigh: social.filter((p: any) => Number(p.relevanceScore ?? 0) >= 60).length,
     };
-  }, [signals, assessments, events]);
+  }, [signals, assessments, events, escalations, social, sources]);
 
   // Assessed signals, newest first — the line listing that makes the pipeline
   // legible and shows which assessments a person has actually reviewed.
@@ -236,13 +285,27 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="p-4 rounded-xl bg-ghi-teal/10 border border-ghi-teal/20 text-xs space-y-2">
-            <div className="flex items-center gap-2 font-black text-ghi-teal uppercase">
-              <CheckCircle2 className="w-4 h-4" /> SOP Compliance Notice
+          {/* Was a hardcoded "SOP Compliance Notice" asserting that all signals
+              were verified within 24 hours — a compliance claim nothing in the
+              system measured. Replaced with collection health, which is the
+              fact this space should carry: a dashboard reporting zero threats
+              looks the same whether the world is quiet or the collectors are
+              down, and that ambiguity is the dangerous one. */}
+          <div className={`p-4 rounded-xl border text-xs space-y-2 ${stats.down > 0 ? 'bg-ghi-warning/10 border-ghi-warning/25' : 'bg-ghi-teal/10 border-ghi-teal/20'}`}>
+            <div className={`flex items-center gap-2 font-black uppercase ${stats.down > 0 ? 'text-ghi-warning' : 'text-ghi-teal'}`}>
+              <CheckCircle2 className="w-4 h-4" /> Collection Health
             </div>
             <p className="text-slate-300 leading-relaxed font-medium">
-              Daily media scanning executed during 09:00 - 10:00 AM window. All active signals verified with relevant sectors within 24 hours of ingestion.
+              <span className="tabular-nums font-black text-white">{stats.live}</span> of{' '}
+              <span className="tabular-nums">{stats.sourceTotal}</span> sources collecting
+              {stats.down > 0 && <> · <span className="text-ghi-warning font-black tabular-nums">{stats.down}</span> failing</>}
+              {stats.blocked > 0 && <> · <span className="tabular-nums">{stats.blocked}</span> awaiting browser rendering</>}
             </p>
+            {stats.oldestPendingDays > 2 && (
+              <p className="text-[11px] text-ghi-warning/90 font-bold">
+                Oldest untriaged signal has waited {stats.oldestPendingDays} days.
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -251,13 +314,15 @@ export default function Dashboard() {
           urgent — a tab would hide them until someone thought to look, which is
           the opposite of what an escalation is for. This band appears only when
           one is open, so an executive opening the dashboard cannot miss it. */}
-      {stats.escalated > 0 && (
-        <div className="rounded-2xl border border-ghi-critical/50 bg-ghi-critical/10 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      {(stats.openEscalations.length > 0 || stats.escalated > 0) && (
+        <div className="rounded-2xl border border-ghi-critical/50 bg-ghi-critical/10 p-5 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <ShieldAlert className="w-6 h-6 text-ghi-critical shrink-0" />
             <div>
               <p className="text-sm font-black text-white uppercase tracking-wider">
-                {stats.escalated} Active Escalation{stats.escalated === 1 ? '' : 's'}
+                {stats.openEscalations.length || stats.escalated} Active Escalation
+                {(stats.openEscalations.length || stats.escalated) === 1 ? '' : 's'}
               </p>
               <p className="text-[11px] text-slate-300 font-medium mt-0.5">
                 Awaiting director review and decision.
@@ -270,6 +335,58 @@ export default function Dashboard() {
           >
             Review Now
           </a>
+          </div>
+
+          {/* The escalations themselves, not just a count. A director opening
+              this needs to know what was escalated, how urgent, and why —
+              a number tells them only that they are behind. */}
+          {stats.openEscalations.length > 0 && (
+            <div className="border-t border-ghi-critical/25 pt-3 space-y-2">
+              {stats.openEscalations.slice(0, 5).map((e: any) => (
+                <div key={e.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[11px]">
+                  <span className={`font-black uppercase tracking-widest px-2 py-0.5 rounded ${e.priority === 'Critical' ? 'bg-ghi-critical/25 text-ghi-critical' : 'bg-ghi-warning/20 text-ghi-warning'}`}>
+                    {e.priority}
+                  </span>
+                  <span className="font-black text-white">
+                    {e.signal?.disease ?? 'Signal'}{e.signal?.country ? ` — ${e.signal.country}` : ''}
+                  </span>
+                  <span className="text-slate-400 flex-1 min-w-[200px]">{e.escalationReason}</span>
+                  <span className="text-slate-500 tabular-nums">
+                    {e.directorStatus ?? 'Pending Review'}
+                    {e.escalatedAt ? ` · ${new Date(e.escalatedAt).toLocaleDateString()}` : ''}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Statutory position. IHR Article 6 gives 24 hours from assessment, so
+          the count that has met the threshold is an obligation rather than a
+          statistic — and the ones nobody has reviewed yet are the exposure. */}
+      {stats.notifiable > 0 && (
+        <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 flex flex-wrap items-center gap-x-8 gap-y-3">
+          <div>
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">IHR Annex 2 Position</p>
+            <p className="text-[11px] text-slate-400 mt-1">Assessments whose answers meet the notification threshold.</p>
+          </div>
+          <div className="flex items-center gap-8 ml-auto">
+            <div>
+              <p className="text-2xl font-black text-white tabular-nums">{stats.notifiable}</p>
+              <p className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Notifiable</p>
+            </div>
+            <div>
+              <p className={`text-2xl font-black tabular-nums ${stats.notifiableUnreviewed > 0 ? 'text-ghi-warning' : 'text-white'}`}>
+                {stats.notifiableUnreviewed}
+              </p>
+              <p className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Unreviewed</p>
+            </div>
+            <div>
+              <p className="text-2xl font-black text-ghi-teal tabular-nums">{stats.socialToday}</p>
+              <p className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Listener 24h</p>
+            </div>
+          </div>
         </div>
       )}
 
