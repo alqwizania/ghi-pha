@@ -87,6 +87,47 @@ export default function Dashboard() {
     const openEscalations = escalations.filter((e: any) =>
       (e.directorStatus ?? 'Pending Review') !== 'Closed' && !e.resolvedAt);
 
+    // What is active, ranked by evidence rather than by summed case counts.
+    //
+    // Summing cases across sources is not defensible here: WHO's MERS figure is
+    // cumulative since 2012, UKHSA's is a 7-day count, GPEI's is year-to-date.
+    // Adding them produces a real-looking number with no shared denominator —
+    // the same mistake that made MERS score Critical.
+    //
+    // Ranked instead on how much independent reporting each disease has
+    // attracted and how severely it scored, which is what event-based
+    // surveillance actually measures. Counts appear per event, never totalled.
+    const byDisease = new Map<string, {
+      disease: string; countries: Set<string>; sources: Set<string>;
+      events: number; topTier: string; maxCases: number; maxDeaths: number;
+    }>();
+
+    for (const e of scored) {
+      if (!e.score?.reportsOccurrence) continue;
+      const key = (e.disease || 'Unspecified').toLowerCase();
+      let d = byDisease.get(key);
+      if (!d) {
+        d = {
+          disease: e.disease || 'Unspecified', countries: new Set(), sources: new Set(),
+          events: 0, topTier: 'routine', maxCases: 0, maxDeaths: 0,
+        };
+        byDisease.set(key, d);
+      }
+      d.events++;
+      if (e.country) d.countries.add(e.country);
+      if (e.sourceId) d.sources.add(e.sourceId);
+      if ((TIER_RANK[e.score.tier] ?? 0) > (TIER_RANK[d.topTier] ?? 0)) d.topTier = e.score.tier;
+      d.maxCases = Math.max(d.maxCases, e.cases ?? 0);
+      d.maxDeaths = Math.max(d.maxDeaths, e.deaths ?? 0);
+    }
+
+    const activeDiseases = [...byDisease.values()]
+      .sort((a, b) =>
+        (TIER_RANK[b.topTier] ?? 0) - (TIER_RANK[a.topTier] ?? 0) ||
+        b.sources.size - a.sources.size ||
+        b.countries.size - a.countries.size)
+      .slice(0, 6);
+
     return {
       total: events.length,
       pendingTriage,
@@ -104,6 +145,7 @@ export default function Dashboard() {
       socialToday: social.filter((p: any) =>
         Date.now() - new Date(p.postedAt || p.createdAt || 0).getTime() < 86400000).length,
       socialHigh: social.filter((p: any) => Number(p.relevanceScore ?? 0) >= 60).length,
+      activeDiseases,
     };
   }, [signals, assessments, events, escalations, social, sources]);
 
@@ -249,40 +291,59 @@ export default function Dashboard() {
           <div>
             <div className="flex items-center gap-2 mb-4">
               <BarChart3 className="w-5 h-5 text-ghi-teal" />
-              <h3 className="text-sm font-black text-white uppercase tracking-wider">Priority Disease Burden</h3>
+              <h3 className="text-sm font-black text-white uppercase tracking-wider">Active Disease Signals</h3>
             </div>
 
-            <div className="space-y-4">
-              <div>
-                <div className="flex justify-between text-xs font-bold mb-1">
-                  <span className="text-white">Cholera</span>
-                  <span className="text-ghi-teal">420 Cases</span>
-                </div>
-                <div className="w-full h-2 rounded-full bg-white/5 overflow-hidden">
-                  <div className="h-full bg-ghi-teal rounded-full" style={{ width: '85%' }}></div>
-                </div>
-              </div>
+            {/*
+              Was "Priority Disease Burden" with three hardcoded diseases —
+              Cholera 420 cases at an 85% bar, and so on. The numbers were
+              invented and the bar widths chosen to look right, which made it
+              the most misleading panel on the page: Cholera in Yemen is a real
+              signal here, so nobody reading "420 cases" had reason to doubt it.
 
-              <div>
-                <div className="flex justify-between text-xs font-bold mb-1">
-                  <span className="text-white">Neisseria meningitidis</span>
-                  <span className="text-ghi-critical">85 Cases (CFR 10.5%)</span>
-                </div>
-                <div className="w-full h-2 rounded-full bg-white/5 overflow-hidden">
-                  <div className="h-full bg-ghi-critical rounded-full" style={{ width: '45%' }}></div>
-                </div>
+              Ranking by summed cases would not have fixed it. WHO's MERS figure
+              is cumulative since 2012, UKHSA's is a 7-day count, GPEI's is
+              year-to-date; adding them gives a real-looking number with no
+              shared denominator. This ranks on independent reporting and
+              severity instead, and shows counts per event rather than totalled.
+            */}
+            {stats.activeDiseases.length === 0 ? (
+              <p className="text-[11px] text-slate-500">
+                No diseases with reported occurrences in the current window.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {stats.activeDiseases.map((d: any) => {
+                  const colour = d.topTier === 'critical' ? 'bg-ghi-critical'
+                    : d.topTier === 'high' ? 'bg-ghi-warning' : 'bg-ghi-teal';
+                  const text = d.topTier === 'critical' ? 'text-ghi-critical'
+                    : d.topTier === 'high' ? 'text-ghi-warning' : 'text-ghi-teal';
+                  // Bar length is corroboration — how many independent sources
+                  // report it — which is a quantity that can honestly be
+                  // compared across diseases. Four sources fills the bar.
+                  const width = Math.min(100, (d.sources.size / 4) * 100);
+                  return (
+                    <div key={d.disease}>
+                      <div className="flex justify-between items-baseline text-xs font-bold mb-1 gap-3">
+                        <span className="text-white truncate">{d.disease}</span>
+                        <span className={`${text} shrink-0 tabular-nums text-[10px]`}>
+                          {d.sources.size} source{d.sources.size === 1 ? '' : 's'}
+                          {d.countries.size > 1 ? ` · ${d.countries.size} countries` : ''}
+                        </span>
+                      </div>
+                      <div className="w-full h-2 rounded-full bg-white/5 overflow-hidden">
+                        <div className={`h-full ${colour} rounded-full transition-all`} style={{ width: `${width}%` }}></div>
+                      </div>
+                      <p className="text-[10px] text-slate-500 mt-1 tabular-nums">
+                        {d.events} event{d.events === 1 ? '' : 's'}
+                        {d.maxCases > 0 && ` · largest report ${d.maxCases} cases`}
+                        {d.maxDeaths > 0 && `, ${d.maxDeaths} deaths`}
+                      </p>
+                    </div>
+                  );
+                })}
               </div>
-
-              <div>
-                <div className="flex justify-between text-xs font-bold mb-1">
-                  <span className="text-white">Avian Influenza H5N1</span>
-                  <span className="text-ghi-warning">34 Cases</span>
-                </div>
-                <div className="w-full h-2 rounded-full bg-white/5 overflow-hidden">
-                  <div className="h-full bg-ghi-warning rounded-full" style={{ width: '25%' }}></div>
-                </div>
-              </div>
-            </div>
+            )}
           </div>
 
           {/* Was a hardcoded "SOP Compliance Notice" asserting that all signals

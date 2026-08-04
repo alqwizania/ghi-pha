@@ -137,7 +137,10 @@ export default function Triage({ user }: any) {
   };
 
   const getSLAString = (deadlineIso?: string) => {
-    if (!deadlineIso) return '24h SLA Active';
+    // Was '24h SLA Active' — a reassuring green label shown on every row
+    // because no signal had ever been given a deadline. An unmeasured
+    // compliance signal is worse than a missing one, so say what is true.
+    if (!deadlineIso) return 'No deadline set';
     const diffMs = new Date(deadlineIso).getTime() - Date.now();
     if (diffMs <= 0) return 'SLA Expired';
     const hours = Math.floor(diffMs / (1000 * 60 * 60));

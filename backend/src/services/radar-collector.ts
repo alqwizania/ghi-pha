@@ -1606,6 +1606,12 @@ export async function scoreAndPromotePending(
             ((result.severity.score + result.unusualness.score + result.spread.score +
               result.tradeTravel.score + result.ksaRelevance.score) / 15) * 100
           ),
+          // WHO event-based surveillance puts verification before risk
+          // assessment, and PHA's SOP gives 24 hours for it. Setting the deadline
+          // at promotion makes the triage countdown a real clock: it was
+          // previously never populated, so every row displayed a reassuring
+          // '24h SLA Active' that measured nothing.
+          verificationDeadline: new Date(Date.now() + 24 * 3600 * 1000),
           triageStatus: 'Pending Triage',
           currentStatus: 'Awaiting Triage',
           sourceStream: 'radar',
